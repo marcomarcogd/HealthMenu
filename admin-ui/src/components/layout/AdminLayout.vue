@@ -43,7 +43,7 @@ const go = (index) => {
       <header class="topbar">
         <div>
           <div class="topbar-title">康服到健管师餐单系统</div>
-          <div class="topbar-subtitle">康服到健管师餐单系统</div>
+          <div class="topbar-subtitle">客户、模板、餐单与字典的一体化管理后台</div>
         </div>
       </header>
       <section class="page-body">

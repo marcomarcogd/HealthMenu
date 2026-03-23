@@ -7,8 +7,6 @@ import com.kfd.healthmenu.dto.CustomerMenuMealItemForm;
 import com.kfd.healthmenu.dto.CustomerMenuSectionForm;
 import com.kfd.healthmenu.entity.Customer;
 import com.kfd.healthmenu.entity.CustomerMenu;
-import com.kfd.healthmenu.entity.CustomerMenuMeal;
-import com.kfd.healthmenu.entity.CustomerMenuSectionContent;
 import com.kfd.healthmenu.entity.MenuPublishRecord;
 import com.kfd.healthmenu.entity.MenuTemplate;
 import com.kfd.healthmenu.mapper.CustomerMapper;
@@ -121,6 +119,8 @@ class CustomerMenuServiceImplTest {
         assertThat(reloaded.getTitle()).isEqualTo("张女士第三周餐单");
         assertThat(reloaded.getShowWeeklyTip()).isTrue();
         assertThat(reloaded.getShowSwapGuide()).isFalse();
+        assertThat(reloaded.getPublishCount()).isEqualTo(1);
+        assertThat(reloaded.getLastPublishedAt()).isNotNull();
         assertThat(reloaded.getSections()).singleElement().satisfies(savedSection -> {
             assertThat(savedSection.getContent()).isEqualTo("多喝水，注意睡眠");
             assertThat(savedSection.getBold()).isTrue();
@@ -135,6 +135,31 @@ class CustomerMenuServiceImplTest {
                 assertThat(savedItem.getAllowImage()).isTrue();
             });
         });
+        assertThat(menuPublishRecordMapper.selectList(null))
+                .filteredOn(itemRecord -> id.equals(itemRecord.getCustomerMenuId()))
+                .filteredOn(itemRecord -> "SHARE_LINK".equals(itemRecord.getExportType()))
+                .hasSize(1);
+    }
+
+    @Test
+    void saveMenu_shouldNotDuplicateShareRecordForPublishedMenu() {
+        CustomerMenuForm form = new CustomerMenuForm();
+        form.setCustomerId(2001L);
+        form.setTemplateId(1001L);
+        form.setMenuDate(LocalDate.of(2026, 3, 24));
+        form.setTitle("published-menu-save-once");
+        form.setStatus("PUBLISHED");
+
+        Long id = customerMenuService.saveMenu(form);
+
+        CustomerMenuForm updateForm = customerMenuService.getFormById(id);
+        updateForm.setTitle("published-menu-save-twice");
+        customerMenuService.saveMenu(updateForm);
+
+        assertThat(menuPublishRecordMapper.selectList(null))
+                .filteredOn(itemRecord -> id.equals(itemRecord.getCustomerMenuId()))
+                .filteredOn(itemRecord -> "SHARE_LINK".equals(itemRecord.getExportType()))
+                .hasSize(1);
     }
 
     @Test

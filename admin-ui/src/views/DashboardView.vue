@@ -146,7 +146,7 @@ function openMenu(row) {
     return
   }
 
-  router.push('/menus')
+  router.push({ path: '/menus', query: { edit: row.id } })
 }
 
 function statusTagType(status) {

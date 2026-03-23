@@ -256,6 +256,7 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
 
         saveSections(menu.getId(), form.getSections());
         saveMeals(menu.getId(), form.getMeals());
+        ensureSharePublishRecord(menu);
         return menu.getId();
     }
 
@@ -667,6 +668,17 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         record.setFileName(fileName);
         record.setOperatorName(operatorName);
         menuPublishRecordMapper.insert(record);
+    }
+
+    private void ensureSharePublishRecord(CustomerMenu menu) {
+        if (menu == null || !RecordStatus.PUBLISHED.name().equals(menu.getStatus())) {
+            return;
+        }
+        if (countPublishRecords(menu.getId()) > 0) {
+            return;
+        }
+        String recordName = StringUtils.hasText(menu.getTitle()) ? menu.getTitle() + "-share-link" : "menu-share-link";
+        recordPublish(menu.getId(), ExportType.SHARE_LINK, buildShareUrl(menu.getShareToken()), recordName, DEFAULT_OPERATOR);
     }
 
     private long countPublishRecords(Long menuId) {

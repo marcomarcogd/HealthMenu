@@ -1,12 +1,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { listDictItems, listDictTypes } from '../api/dict'
 import { useRouter } from 'vue-router'
 import { copyTemplate, deleteTemplate, previewTemplate, saveTemplate, updateTemplateStatus } from '../api/template'
 import { useTemplateStore } from '../stores/template'
 
 const router = useRouter()
 const store = useTemplateStore()
+const themeOptions = ref([])
 const previewVisible = ref(false)
 const editorVisible = ref(false)
 const previewData = ref(null)
@@ -25,6 +27,24 @@ function createEmptyForm() {
 }
 
 const dialogTitle = computed(() => (form.id ? '编辑模板' : '新建模板'))
+
+function createFallbackThemeOptions() {
+  return [{ label: '标准主题', value: 'standard' }]
+}
+
+function normalizeDictOptions(items) {
+  return (items || [])
+    .filter((item) => item.status !== 0)
+    .sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0))
+    .map((item) => ({
+      label: item.itemLabel || item.itemValue || item.itemCode,
+      value: item.itemValue || item.itemCode,
+    }))
+}
+
+function resolveThemeLabel(themeCode) {
+  return themeOptions.value.find((item) => item.value === themeCode)?.label || themeCode || '-'
+}
 
 function resetForm() {
   Object.assign(form, createEmptyForm())
@@ -64,7 +84,7 @@ async function submit() {
       ...form,
       name: form.name.trim(),
       description: form.description.trim(),
-      themeCode: form.themeCode.trim(),
+      themeCode: (form.themeCode || 'standard').trim(),
     })
     ElMessage.success('模板已保存')
     closeEditor()
@@ -73,6 +93,24 @@ async function submit() {
     ElMessage.error(error?.message || '模板保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+async function loadThemeOptions() {
+  try {
+    const types = await listDictTypes()
+    const themeType = (types || []).find((item) => item.typeCode === 'theme_code')
+    if (!themeType?.id) {
+      themeOptions.value = createFallbackThemeOptions()
+      return
+    }
+    const items = await listDictItems(themeType.id)
+    themeOptions.value = normalizeDictOptions(items)
+    if (!themeOptions.value.length) {
+      themeOptions.value = createFallbackThemeOptions()
+    }
+  } catch {
+    themeOptions.value = createFallbackThemeOptions()
   }
 }
 
@@ -119,8 +157,8 @@ async function handlePreview(row) {
   }
 }
 
-onMounted(() => {
-  store.fetchTemplates()
+onMounted(async () => {
+  await Promise.all([store.fetchTemplates(), loadThemeOptions()])
 })
 </script>
 
@@ -136,7 +174,9 @@ onMounted(() => {
     <el-table :data="store.templates" v-loading="store.loading">
       <el-table-column prop="name" label="模板名称" min-width="180" />
       <el-table-column prop="description" label="说明" min-width="240" />
-      <el-table-column prop="themeCode" label="主题" width="120" />
+      <el-table-column label="主题" width="140">
+        <template #default="{ row }">{{ resolveThemeLabel(row.themeCode) }}</template>
+      </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
@@ -168,7 +208,15 @@ onMounted(() => {
         <el-input v-model="form.description" type="textarea" :rows="4" placeholder="说明适用人群或场景" />
       </el-form-item>
       <el-form-item label="主题编码">
-        <el-input v-model="form.themeCode" placeholder="当前仍为自由输入" />
+        <el-select
+          v-model="form.themeCode"
+          filterable
+          allow-create
+          default-first-option
+          placeholder="优先从字典选择，也可直接输入"
+        >
+          <el-option v-for="item in themeOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
       </el-form-item>
       <el-form-item label="状态">
         <el-radio-group v-model="form.status">

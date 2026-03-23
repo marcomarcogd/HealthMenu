@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRoute, useRouter } from 'vue-router'
 import { getAdminOptions } from '../api/options'
 import {
   deleteMenu,
@@ -23,6 +24,8 @@ import {
   normalizeMenuSavePayload,
 } from '../utils/menu-form'
 
+const route = useRoute()
+const router = useRouter()
 const menus = ref([])
 const loading = ref(false)
 const formLoading = ref(false)
@@ -35,6 +38,7 @@ const menuForm = ref(createEmptyMenuForm())
 const dirty = ref(false)
 const lastSavedLinks = ref({ viewUrl: '', shareUrl: '' })
 const generatingImageTarget = ref(null)
+const routeEditLoading = ref(false)
 const appBaseUrl = window.location.origin
 
 const canInit = computed(() => selector.value.customerId && selector.value.templateId)
@@ -302,6 +306,23 @@ async function editMenu(row) {
   }
 }
 
+async function openMenuFromRoute(menuId) {
+  if (!menuId || routeEditLoading.value) {
+    return
+  }
+
+  routeEditLoading.value = true
+  try {
+    const targetRow = menus.value.find((item) => String(item.id) === String(menuId)) || { id: menuId }
+    await editMenu(targetRow)
+    const nextQuery = { ...route.query }
+    delete nextQuery.edit
+    await router.replace({ path: route.path, query: nextQuery })
+  } finally {
+    routeEditLoading.value = false
+  }
+}
+
 function nextStep() {
   if (!hasStepOneContent.value) {
     ElMessage.warning('当前餐单还没有可编辑内容')
@@ -425,7 +446,15 @@ async function handleDialogClose(done) {
 
 onMounted(async () => {
   await Promise.all([loadOptions(), refreshMenus()])
+  await openMenuFromRoute(route.query.edit)
 })
+
+watch(
+  () => route.query.edit,
+  async (value) => {
+    await openMenuFromRoute(value)
+  },
+)
 </script>
 
 <template>

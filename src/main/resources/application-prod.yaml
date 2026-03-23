@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: ${HEALTH_MENU_DB_URL}
+    username: ${HEALTH_MENU_DB_USERNAME}
+    password: ${HEALTH_MENU_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: ${HEALTH_MENU_SQL_INIT_MODE:never}
+      schema-locations: classpath:/sql/schema.sql
+      data-locations: classpath:/sql/data.sql
+
+app:
+  frontend-base-url: ${APP_FRONTEND_BASE_URL}
+  ai-import:
+    enabled: ${APP_AI_IMPORT_ENABLED:true}
+    provider: ${APP_AI_IMPORT_PROVIDER:coze}
+  coze:
+    enabled: ${APP_COZE_ENABLED:true}

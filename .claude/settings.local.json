@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:Usersvv768IdeaProjectsHealthMenu -type f -name *.md -o -name *.txt -o -name pom.xml -o -name build.gradle -o -name package.json)",
+      "Bash(mvn:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Skill(update-config)",
+      "Bash(*)",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep"
+    ],
+    "defaultMode": "dontAsk"
+  }
+}

@@ -198,21 +198,18 @@ public class AiImportServiceImpl implements AiImportService {
         if (!hasMeaningfulResult(dto)) {
             return buildLooseFallback(sourceText);
         }
-        if (dto.getMeals().isEmpty()) {
-            dto.setMeals(buildDefaultMeals());
-        }
         return dto;
     }
 
     private AiImportResultDto buildLooseFallback(String sourceText) {
         AiImportResultDto dto = new AiImportResultDto();
         dto.setParseMode("FALLBACK");
-        dto.setParseMessage("未识别出明确餐次，已返回默认结构，请手动调整");
+        dto.setParseMessage("未识别出明确餐次，未再填充示例餐单，请手动补充或调整原始文本后重试");
         dto.setTitle(extractTitle(sourceText));
         dto.setWeekIndex(extractWeekIndex(sourceText));
         dto.setWeeklyTip(extractSectionText(sourceText, "每周提示", "建议", "提醒"));
         dto.setSwapGuide(extractSectionText(sourceText, "互换", "替换", "等量"));
-        dto.setMeals(buildDefaultMeals());
+        dto.setMeals(new ArrayList<>());
         normalizeMealStyles(dto);
         return dto;
     }
@@ -522,49 +519,6 @@ public class AiImportServiceImpl implements AiImportService {
                 }
             }
         }
-    }
-
-    private List<CustomerMenuMealForm> buildDefaultMeals() {
-        List<CustomerMenuMealForm> meals = new ArrayList<>();
-        meals.add(buildMeal("breakfast", "早餐", "早餐时间", "08:00", List.of(
-                item("staple", "主食", "燕麦 40g + 全麦面包 2 片"),
-                item("protein", "蛋白", "鸡蛋 2 个 + 无糖酸奶 1 杯"),
-                item("vegetable", "蔬菜", "生菜/小番茄适量"),
-                item("other", "其他", "黑咖啡或温水 1 杯")
-        )));
-        meals.add(buildMeal("lunch", "午餐", "午餐时间", "12:00", List.of(
-                item("staple", "主食", "糙米饭 1 碗"),
-                item("protein", "蛋白", "清蒸鱼 150g"),
-                item("vegetable", "蔬菜", "西兰花 + 胡萝卜"),
-                item("other", "其他", "少油少盐")
-        )));
-        meals.add(buildMeal("dinner", "晚餐", "晚餐时间", "18:00", List.of(
-                item("staple", "主食", "玉米 1 根"),
-                item("protein", "蛋白", "鸡胸肉 120g"),
-                item("vegetable", "蔬菜", "菠菜 + 菌菇"),
-                item("other", "其他", "睡前避免高糖水果")
-        )));
-        return meals;
-    }
-
-    private CustomerMenuMealForm buildMeal(String code, String name, String timeLabel, String time, List<CustomerMenuMealItemForm> items) {
-        CustomerMenuMealForm meal = new CustomerMenuMealForm();
-        meal.setMealCode(code);
-        meal.setMealName(name);
-        meal.setTimeLabel(timeLabel);
-        meal.setMealTime(time);
-        meal.setItems(items);
-        return meal;
-    }
-
-    private CustomerMenuMealItemForm item(String code, String name, String value) {
-        CustomerMenuMealItemForm item = new CustomerMenuMealItemForm();
-        item.setItemCode(code);
-        item.setItemName(name);
-        item.setItemValue(value);
-        item.setColor("#2d2d2d");
-        item.setBold(false);
-        return item;
     }
 
     private record MealDescriptor(String code, String displayName) {

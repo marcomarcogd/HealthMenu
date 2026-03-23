@@ -5,6 +5,7 @@ import { getAdminOptions } from '../api/options'
 import {
   deleteMenu,
   downloadMenuExcel,
+  generateMenuImage,
   getMenuDetail,
   initMenuForm,
   listMenus,
@@ -33,6 +34,7 @@ const selector = ref(createEmptyMenuSelector())
 const menuForm = ref(createEmptyMenuForm())
 const dirty = ref(false)
 const lastSavedLinks = ref({ viewUrl: '', shareUrl: '' })
+const generatingImageTarget = ref(null)
 const appBaseUrl = window.location.origin
 
 const canInit = computed(() => selector.value.customerId && selector.value.templateId)
@@ -148,6 +150,55 @@ function uploadMealItemImage(item, options) {
   return handleImageUpload(item, options)
 }
 
+function isGeneratingImage(target) {
+  return generatingImageTarget.value === target
+}
+
+function buildImagePrompt(target, fallbackLabel) {
+  const explicitPrompt = target?.aiImagePrompt?.trim()
+  if (explicitPrompt) {
+    return explicitPrompt
+  }
+
+  const content = 'itemValue' in target ? target.itemValue : target.content
+  return [fallbackLabel, content]
+    .filter((value) => value?.trim?.())
+    .join('，')
+    .trim()
+}
+
+async function generateTargetImage(target, fallbackLabel) {
+  const prompt = buildImagePrompt(target, fallbackLabel)
+  if (!prompt) {
+    ElMessage.warning('请先填写 AI 生图提示词，或补充当前内容')
+    return
+  }
+
+  generatingImageTarget.value = target
+  target.aiImagePrompt = prompt
+  try {
+    const result = await generateMenuImage(prompt)
+    target.imagePath = result.path || ''
+    target.aiImagePrompt = result.prompt || prompt
+    markDirty()
+    ElMessage.success('AI 图片生成成功')
+  } catch (error) {
+    ElMessage.error(error?.message || 'AI 图片生成失败')
+  } finally {
+    if (generatingImageTarget.value === target) {
+      generatingImageTarget.value = null
+    }
+  }
+}
+
+function generateSectionImage(section) {
+  return generateTargetImage(section, section.title || section.sectionType || '餐单区块')
+}
+
+function generateMealItemAiImage(item) {
+  return generateTargetImage(item, item.itemName || '餐品图片')
+}
+
 function clearImage(target) {
   target.imagePath = ''
   markDirty()
@@ -210,7 +261,12 @@ async function previewAi() {
   formLoading.value = true
   try {
     const result = await parseMenuText(selector.value.sourceText)
-    ElMessage.success(buildAiPreviewSummary(result))
+    const summary = buildAiPreviewSummary(result)
+    if (result.parseMode === 'AI') {
+      ElMessage.success(summary)
+    } else {
+      ElMessage.warning(summary)
+    }
   } catch (error) {
     ElMessage.error(error?.message || 'AI 解析失败')
   } finally {
@@ -488,6 +544,11 @@ onMounted(async () => {
             <div class="editor-title">{{ section.title || section.sectionType }}</div>
             <el-input v-model="section.content" type="textarea" :rows="3" @input="markDirty" />
             <div v-if="section.allowImage" class="menu-image-actions">
+              <el-input
+                v-model="section.aiImagePrompt"
+                placeholder="AI 生图提示词；不填则按当前区块内容生成"
+                @input="markDirty"
+              />
               <el-upload
                 :show-file-list="false"
                 accept="image/*"
@@ -495,8 +556,9 @@ onMounted(async () => {
               >
                 <el-button plain>上传图片</el-button>
               </el-upload>
+              <el-button type="success" plain :loading="isGeneratingImage(section)" @click="generateSectionImage(section)">AI 生图</el-button>
               <el-button v-if="section.imagePath" link type="danger" @click="clearImage(section)">移除图片</el-button>
-              <span class="menu-image-note">当前为手动上传，AI 生图尚未接通。</span>
+              <span class="menu-image-note">支持手动上传，也支持按提示词直接生成。</span>
             </div>
             <el-image
               v-if="section.imagePath"
@@ -519,6 +581,11 @@ onMounted(async () => {
                 <div class="mini-label">{{ item.itemName }}</div>
                 <el-input v-model="item.itemValue" type="textarea" :rows="2" @input="markDirty" />
                 <div v-if="item.allowImage" class="menu-image-actions">
+                  <el-input
+                    v-model="item.aiImagePrompt"
+                    placeholder="AI 生图提示词；不填则按当前食材内容生成"
+                    @input="markDirty"
+                  />
                   <el-upload
                     :show-file-list="false"
                     accept="image/*"
@@ -526,6 +593,7 @@ onMounted(async () => {
                   >
                     <el-button plain>上传图片</el-button>
                   </el-upload>
+                  <el-button type="success" plain :loading="isGeneratingImage(item)" @click="generateMealItemAiImage(item)">AI 生图</el-button>
                   <el-button v-if="item.imagePath" link type="danger" @click="clearImage(item)">移除图片</el-button>
                 </div>
                 <el-image

@@ -95,7 +95,8 @@ export function buildAiPreviewSummary(result = {}) {
   const mealCount = result.meals?.length || 0
   const sectionCount = result.sections?.length || 0
   const title = result.title?.trim() || '未识别标题'
-  return `AI 解析完成：标题「${title}」，识别 ${mealCount} 个餐次、${sectionCount} 个区块`
+  const summary = `AI 解析完成：标题「${title}」，识别 ${mealCount} 个餐次、${sectionCount} 个区块`
+  return result.parseMessage ? `${summary}。${result.parseMessage}` : summary
 }
 
 export function hasMenuContent(form) {

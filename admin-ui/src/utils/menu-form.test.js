@@ -31,6 +31,7 @@ describe('menu-form utils', () => {
 
   it('builds ai preview summary', () => {
     expect(buildAiPreviewSummary({ title: '营养周菜单', meals: [{}, {}], sections: [{}] })).toBe('AI 解析完成：标题「营养周菜单」，识别 2 个餐次、1 个区块')
+    expect(buildAiPreviewSummary({ title: '营养周菜单', meals: [], sections: [], parseMessage: '未识别出明确餐次' })).toBe('AI 解析完成：标题「营养周菜单」，识别 0 个餐次、0 个区块。未识别出明确餐次')
   })
 
   it('detects whether form has content', () => {

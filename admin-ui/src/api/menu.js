@@ -14,6 +14,7 @@ export const saveMenu = (payload) => request.post('/menus', {
   templateId: payload.templateId ? Number(payload.templateId) : null,
 })
 export const parseMenuText = (sourceText) => request.post('/menus/ai/parse', { sourceText })
+export const generateMenuImage = (prompt) => request.post('/menus/ai/generate-image', { prompt })
 export const publishMenu = (id) => request.post(`/menus/${id}/publish`)
 export const deleteMenu = (id) => request.delete(`/menus/${id}`)
 export const uploadMenuImage = (file) => {

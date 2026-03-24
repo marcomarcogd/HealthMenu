@@ -41,6 +41,11 @@ const lastSavedLinks = ref({ viewUrl: '', shareUrl: '' })
 const generatingImageTarget = ref(null)
 const routeEditLoading = ref(false)
 const appBaseUrl = window.location.origin
+const pagination = ref({
+  page: 1,
+  pageSize: 10,
+  total: 0,
+})
 const menuFilters = ref({
   keyword: '',
   status: 'ALL',
@@ -55,49 +60,40 @@ const menuStatusOptions = computed(() => [
   { label: '全部状态', value: 'ALL' },
   ...(options.value.recordStatuses || []),
 ])
-const filteredMenus = computed(() => {
-  const keyword = menuFilters.value.keyword.trim().toLowerCase()
-  const status = menuFilters.value.status
-  const sort = menuFilters.value.sort
-
-  const matched = menus.value.filter((row) => {
-    const matchesStatus = status === 'ALL' || row.status === status
-    if (!matchesStatus) {
-      return false
-    }
-
-    if (!keyword) {
-      return true
-    }
-
-    const searchable = [
-      row.title,
-      row.menuDate,
-      row.themeName,
-      row.themeCode,
-      row.statusLabel,
-      row.status,
-      `第${row.weekIndex || '-'}周`,
-    ]
-
-    return searchable.some((value) => String(value || '').toLowerCase().includes(keyword))
-  })
-
-  return [...matched].sort((left, right) => compareMenus(left, right, sort))
-})
 const menuSummary = computed(() => {
-  const total = menus.value.length
-  const visible = filteredMenus.value.length
-  const published = filteredMenus.value.filter((item) => item.status === 'PUBLISHED').length
+  const total = pagination.value.total
+  const visible = menus.value.length
+  const published = menus.value.filter((item) => item.status === 'PUBLISHED').length
   const drafts = visible - published
 
   return { total, visible, published, drafts }
 })
 
-async function refreshMenus() {
+async function refreshMenus(targetPage = pagination.value.page) {
   loading.value = true
   try {
-    menus.value = await listMenus()
+    const result = await listMenus({
+      keyword: menuFilters.value.keyword.trim() || undefined,
+      status: menuFilters.value.status === 'ALL' ? undefined : menuFilters.value.status,
+      sort: menuFilters.value.sort,
+      page: targetPage,
+      pageSize: pagination.value.pageSize,
+    })
+
+    const safeTotal = Number(result?.total || 0)
+    const maxPage = Math.max(1, Math.ceil(safeTotal / pagination.value.pageSize))
+    if (safeTotal > 0 && targetPage > maxPage) {
+      await refreshMenus(maxPage)
+      return
+    }
+
+    menus.value = result?.records || []
+    pagination.value = {
+      ...pagination.value,
+      page: Number(result?.page || targetPage || 1),
+      total: safeTotal,
+      pageSize: Number(result?.pageSize || pagination.value.pageSize),
+    }
   } finally {
     loading.value = false
   }
@@ -162,27 +158,6 @@ function displayPublishTime(row) {
   return row.lastPublishedAt || '-'
 }
 
-function compareMenus(left, right, sort) {
-  if (sort === 'titleAsc') {
-    return String(left.title || '').localeCompare(String(right.title || ''), 'zh-CN')
-  }
-
-  if (sort === 'publishDesc') {
-    return getSortTime(right.lastPublishedAt || right.menuDate) - getSortTime(left.lastPublishedAt || left.menuDate)
-  }
-
-  if (sort === 'menuDateAsc') {
-    return getSortTime(left.menuDate) - getSortTime(right.menuDate)
-  }
-
-  return getSortTime(right.menuDate || right.lastPublishedAt) - getSortTime(left.menuDate || left.lastPublishedAt)
-}
-
-function getSortTime(value) {
-  const time = new Date(value || 0).getTime()
-  return Number.isFinite(time) ? time : 0
-}
-
 function canPublish(row) {
   return row?.id && row?.status !== 'PUBLISHED'
 }
@@ -193,6 +168,21 @@ function resetMenuFilters() {
     status: 'ALL',
     sort: 'menuDateDesc',
   }
+  pagination.value.page = 1
+  refreshMenus(1)
+}
+
+function applyMenuFilters() {
+  refreshMenus(1)
+}
+
+function handlePageChange(page) {
+  refreshMenus(page)
+}
+
+function handlePageSizeChange(pageSize) {
+  pagination.value.pageSize = pageSize
+  refreshMenus(1)
 }
 
 function validateImageFile(file) {
@@ -554,16 +544,19 @@ watch(
           clearable
           placeholder="搜索标题、日期、主题或周次"
           class="menu-toolbar__search"
+          @keyup.enter="applyMenuFilters"
+          @clear="applyMenuFilters"
         />
-        <el-select v-model="menuFilters.status" class="menu-toolbar__select">
+        <el-select v-model="menuFilters.status" class="menu-toolbar__select" @change="applyMenuFilters">
           <el-option v-for="item in menuStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
-        <el-select v-model="menuFilters.sort" class="menu-toolbar__select">
+        <el-select v-model="menuFilters.sort" class="menu-toolbar__select" @change="applyMenuFilters">
           <el-option label="按日期倒序" value="menuDateDesc" />
           <el-option label="按日期正序" value="menuDateAsc" />
-          <el-option label="按最近发布" value="publishDesc" />
+          <el-option label="按最近修改" value="updatedDesc" />
           <el-option label="按标题排序" value="titleAsc" />
         </el-select>
+        <el-button type="primary" plain @click="applyMenuFilters">查询</el-button>
         <el-button plain @click="resetMenuFilters">清空筛选</el-button>
       </div>
       <div class="menu-toolbar__summary">
@@ -573,7 +566,7 @@ watch(
       </div>
     </div>
 
-    <el-table :data="filteredMenus" v-loading="loading" empty-text="没有符合条件的餐单">
+    <el-table :data="menus" v-loading="loading" empty-text="没有符合条件的餐单">
       <el-table-column prop="title" label="餐单标题" min-width="180" />
       <el-table-column prop="menuDate" label="日期" width="140" />
       <el-table-column prop="weekIndex" label="周次" width="90" />
@@ -600,6 +593,19 @@ watch(
         </template>
       </el-table-column>
     </el-table>
+
+    <div class="menu-pagination">
+      <el-pagination
+        background
+        layout="total, sizes, prev, pager, next"
+        :current-page="pagination.page"
+        :page-size="pagination.pageSize"
+        :page-sizes="[10, 20, 30, 50]"
+        :total="pagination.total"
+        @current-change="handlePageChange"
+        @size-change="handlePageSizeChange"
+      />
+    </div>
   </el-card>
 
   <el-dialog
@@ -859,6 +865,12 @@ watch(
   flex-wrap: wrap;
 }
 
+.menu-pagination {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 900px) {
   .menu-toolbar,
   .menu-toolbar__filters,
@@ -870,6 +882,10 @@ watch(
   .menu-toolbar__search,
   .menu-toolbar__select {
     width: 100%;
+  }
+
+  .menu-pagination {
+    justify-content: stretch;
   }
 }
 </style>

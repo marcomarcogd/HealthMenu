@@ -1,7 +1,7 @@
 import axios from 'axios'
 import request from './request'
 
-export const listMenus = () => request.get('/menus')
+export const listMenus = (params = {}) => request.get('/menus', { params })
 export const initMenuForm = (payload) => request.post('/menus/init', {
   ...payload,
   customerId: payload.customerId ? Number(payload.customerId) : null,

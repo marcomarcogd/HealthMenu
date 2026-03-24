@@ -4,6 +4,8 @@ import com.kfd.healthmenu.dto.AiImportResultDto;
 import com.kfd.healthmenu.dto.CustomerMenuForm;
 import com.kfd.healthmenu.dto.CustomerMenuMealForm;
 import com.kfd.healthmenu.dto.CustomerMenuMealItemForm;
+import com.kfd.healthmenu.dto.api.PageResult;
+import com.kfd.healthmenu.dto.menu.CustomerMenuSummaryDto;
 import com.kfd.healthmenu.service.CustomerMenuService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -40,6 +43,36 @@ class AdminMenuApiControllerTest {
 
     @MockBean
     private CustomerMenuService customerMenuService;
+
+    @Test
+    void list_shouldReturnPagedSummaries() throws Exception {
+        CustomerMenuSummaryDto summary = new CustomerMenuSummaryDto();
+        summary.setId(7001L);
+        summary.setTitle("午餐恢复日");
+        summary.setStatus("DRAFT");
+        summary.setStatusLabel("草稿");
+        when(customerMenuService.listSummaries(argThat(query ->
+                query != null
+                        && "午餐".equals(query.getKeyword())
+                        && "DRAFT".equals(query.getStatus())
+                        && "titleAsc".equals(query.getSort())
+                        && query.getPage() == 2L
+                        && query.getPageSize() == 5L
+        ))).thenReturn(new PageResult<>(List.of(summary), 6L, 2L, 5L));
+
+        mockMvc.perform(get("/api/admin/menus")
+                        .param("keyword", "午餐")
+                        .param("status", "DRAFT")
+                        .param("sort", "titleAsc")
+                        .param("page", "2")
+                        .param("pageSize", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.records[0].title").value("午餐恢复日"))
+                .andExpect(jsonPath("$.data.total").value(6))
+                .andExpect(jsonPath("$.data.page").value(2))
+                .andExpect(jsonPath("$.data.pageSize").value(5));
+    }
 
     @Test
     void init_withoutAi_shouldReturnTemplateBasedForm() throws Exception {

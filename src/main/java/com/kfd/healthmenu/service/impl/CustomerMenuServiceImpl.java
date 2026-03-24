@@ -11,7 +11,9 @@ import com.kfd.healthmenu.dto.CustomerMenuMealForm;
 import com.kfd.healthmenu.dto.CustomerMenuMealItemForm;
 import com.kfd.healthmenu.dto.CustomerMenuSectionForm;
 import com.kfd.healthmenu.dto.TextStyleDto;
+import com.kfd.healthmenu.dto.api.PageResult;
 import com.kfd.healthmenu.dto.menu.CustomerMenuSummaryDto;
+import com.kfd.healthmenu.dto.menu.MenuSummaryQuery;
 import com.kfd.healthmenu.entity.Customer;
 import com.kfd.healthmenu.entity.CustomerMenu;
 import com.kfd.healthmenu.entity.CustomerMenuMeal;
@@ -70,8 +72,45 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
     }
 
     @Override
-    public List<CustomerMenuSummaryDto> listSummaries() {
-        return listAll().stream().map(this::toSummaryDto).toList();
+    public PageResult<CustomerMenuSummaryDto> listSummaries(MenuSummaryQuery query) {
+        MenuSummaryQuery safeQuery = query == null ? new MenuSummaryQuery() : query;
+        long pageNumber = normalizePageNumber(safeQuery.getPage());
+        long pageSize = normalizePageSize(safeQuery.getPageSize());
+
+        LambdaQueryWrapper<CustomerMenu> wrapper = new LambdaQueryWrapper<CustomerMenu>()
+                .eq(CustomerMenu::getDeleted, 0);
+
+        if (StringUtils.hasText(safeQuery.getStatus())) {
+            wrapper.eq(CustomerMenu::getStatus, safeQuery.getStatus().trim());
+        }
+
+        if (StringUtils.hasText(safeQuery.getKeyword())) {
+            String keyword = safeQuery.getKeyword().trim();
+            wrapper.and(q -> q.like(CustomerMenu::getTitle, keyword)
+                    .or()
+                    .like(CustomerMenu::getThemeCode, keyword)
+                    .or()
+                    .apply("CAST(menu_date AS CHAR) LIKE {0}", "%" + keyword + "%")
+                    .or()
+                    .apply("CAST(week_index AS CHAR) LIKE {0}", "%" + keyword + "%"));
+        }
+
+        applySummarySort(wrapper, safeQuery.getSort());
+
+        long total = customerMenuMapper.selectCount(wrapper);
+        if (total <= 0) {
+            return new PageResult<>(Collections.emptyList(), 0L, pageNumber, pageSize);
+        }
+
+        long offset = (pageNumber - 1) * pageSize;
+        wrapper.last("limit " + offset + ", " + pageSize);
+        List<CustomerMenu> records = customerMenuMapper.selectList(wrapper);
+        return new PageResult<>(
+                records.stream().map(this::toSummaryDto).toList(),
+                total,
+                pageNumber,
+                pageSize
+        );
     }
 
     @Override
@@ -650,6 +689,27 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         dto.setPublishCount((int) countPublishRecords(menu.getId()));
         dto.setLastPublishedAt(findLastPublishedAt(menu.getId()));
         return dto;
+    }
+
+    private void applySummarySort(LambdaQueryWrapper<CustomerMenu> wrapper, String sort) {
+        String sortValue = StringUtils.hasText(sort) ? sort.trim() : "menuDateDesc";
+        switch (sortValue) {
+            case "menuDateAsc" -> wrapper.orderByAsc(CustomerMenu::getMenuDate).orderByDesc(CustomerMenu::getUpdateTime);
+            case "updatedDesc" -> wrapper.orderByDesc(CustomerMenu::getUpdateTime).orderByDesc(CustomerMenu::getMenuDate);
+            case "titleAsc" -> wrapper.orderByAsc(CustomerMenu::getTitle).orderByDesc(CustomerMenu::getMenuDate);
+            default -> wrapper.orderByDesc(CustomerMenu::getMenuDate).orderByDesc(CustomerMenu::getUpdateTime);
+        }
+    }
+
+    private long normalizePageNumber(long pageNumber) {
+        return Math.max(pageNumber, 1L);
+    }
+
+    private long normalizePageSize(long pageSize) {
+        if (pageSize <= 0) {
+            return 10L;
+        }
+        return Math.min(pageSize, 50L);
     }
 
     private CustomerMenu requireMenu(Long id) {

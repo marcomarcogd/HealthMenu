@@ -5,10 +5,12 @@ import com.kfd.healthmenu.dto.CustomerMenuForm;
 import com.kfd.healthmenu.dto.api.AiImageResponse;
 import com.kfd.healthmenu.dto.api.ApiResponse;
 import com.kfd.healthmenu.dto.api.IdResponse;
+import com.kfd.healthmenu.dto.api.PageResult;
 import com.kfd.healthmenu.dto.menu.AiImageGenerateRequest;
 import com.kfd.healthmenu.dto.menu.AiMenuParseRequest;
 import com.kfd.healthmenu.dto.menu.CustomerMenuSummaryDto;
 import com.kfd.healthmenu.dto.menu.MenuInitRequest;
+import com.kfd.healthmenu.dto.menu.MenuSummaryQuery;
 import com.kfd.healthmenu.service.CustomerMenuService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -22,8 +24,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/admin/menus")
 @RequiredArgsConstructor
@@ -32,8 +32,8 @@ public class AdminMenuApiController {
     private final CustomerMenuService customerMenuService;
 
     @GetMapping
-    public ApiResponse<List<CustomerMenuSummaryDto>> list() {
-        return ApiResponse.success(customerMenuService.listSummaries());
+    public ApiResponse<PageResult<CustomerMenuSummaryDto>> list(MenuSummaryQuery query) {
+        return ApiResponse.success(customerMenuService.listSummaries(query));
     }
 
     @PostMapping("/init")

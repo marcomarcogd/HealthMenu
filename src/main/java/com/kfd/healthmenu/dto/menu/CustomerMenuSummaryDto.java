@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class CustomerMenuSummaryDto {
     private Long id;
     private Long customerId;
+    private String customerName;
     private Long templateId;
     private LocalDate menuDate;
     private Integer weekIndex;

@@ -25,6 +25,8 @@ import {
 } from '../utils/menu-form'
 import { copyText } from '../utils/clipboard'
 
+const MENU_EDITOR_DRAFT_KEY = 'healthmenu.menu-editor-draft'
+
 const route = useRoute()
 const router = useRouter()
 const menus = ref([])
@@ -41,6 +43,8 @@ const lastSavedLinks = ref({ viewUrl: '', shareUrl: '' })
 const generatingImageTarget = ref(null)
 const routeEditLoading = ref(false)
 const appBaseUrl = window.location.origin
+const autosaveHandle = ref(null)
+const recoverableDraft = ref(null)
 const pagination = ref({
   page: 1,
   pageSize: 10,
@@ -48,6 +52,7 @@ const pagination = ref({
 })
 const menuFilters = ref({
   keyword: '',
+  customerId: '',
   status: 'ALL',
   sort: 'menuDateDesc',
 })
@@ -59,6 +64,13 @@ const dialogTitle = computed(() => (menuForm.value.id ? '编辑餐单' : '新建
 const menuStatusOptions = computed(() => [
   { label: '全部状态', value: 'ALL' },
   ...(options.value.recordStatuses || []),
+])
+const customerFilterOptions = computed(() => [
+  { label: '全部客户', value: '' },
+  ...(options.value.customers || []).map((item) => ({
+    label: item.label,
+    value: item.value,
+  })),
 ])
 const menuSummary = computed(() => {
   const total = pagination.value.total
@@ -74,6 +86,7 @@ async function refreshMenus(targetPage = pagination.value.page) {
   try {
     const result = await listMenus({
       keyword: menuFilters.value.keyword.trim() || undefined,
+      customerId: menuFilters.value.customerId || undefined,
       status: menuFilters.value.status === 'ALL' ? undefined : menuFilters.value.status,
       sort: menuFilters.value.sort,
       page: targetPage,
@@ -113,6 +126,8 @@ function resetEditor() {
   lastSavedLinks.value = { viewUrl: '', shareUrl: '' }
   currentStep.value = 0
   dirty.value = false
+  clearRecoverableDraft()
+  clearEditorDraft()
 }
 
 function resolveAppUrl(url) {
@@ -165,6 +180,7 @@ function canPublish(row) {
 function resetMenuFilters() {
   menuFilters.value = {
     keyword: '',
+    customerId: '',
     status: 'ALL',
     sort: 'menuDateDesc',
   }
@@ -183,6 +199,129 @@ function handlePageChange(page) {
 function handlePageSizeChange(pageSize) {
   pagination.value.pageSize = pageSize
   refreshMenus(1)
+}
+
+function buildDraftPayload() {
+  return {
+    selector: selector.value,
+    menuForm: menuForm.value,
+    lastSavedLinks: lastSavedLinks.value,
+    currentStep: currentStep.value,
+    dirty: dirty.value,
+    savedAt: new Date().toISOString(),
+  }
+}
+
+function saveEditorDraft() {
+  if (!editorVisible.value || !hasMenuContent(menuForm.value)) {
+    return
+  }
+
+  window.localStorage.setItem(MENU_EDITOR_DRAFT_KEY, JSON.stringify(buildDraftPayload()))
+  recoverableDraft.value = {
+    savedAt: new Date().toISOString(),
+    title: menuForm.value.title || '未命名草稿',
+  }
+}
+
+function scheduleDraftSave() {
+  if (autosaveHandle.value) {
+    window.clearTimeout(autosaveHandle.value)
+  }
+
+  autosaveHandle.value = window.setTimeout(() => {
+    saveEditorDraft()
+    autosaveHandle.value = null
+  }, 500)
+}
+
+function clearEditorDraft() {
+  if (autosaveHandle.value) {
+    window.clearTimeout(autosaveHandle.value)
+    autosaveHandle.value = null
+  }
+  window.localStorage.removeItem(MENU_EDITOR_DRAFT_KEY)
+}
+
+function clearRecoverableDraft() {
+  recoverableDraft.value = null
+}
+
+function loadRecoverableDraft() {
+  const raw = window.localStorage.getItem(MENU_EDITOR_DRAFT_KEY)
+  if (!raw) {
+    recoverableDraft.value = null
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+    recoverableDraft.value = {
+      savedAt: parsed?.savedAt || '',
+      title: parsed?.menuForm?.title || '未命名草稿',
+    }
+  } catch {
+    clearEditorDraft()
+    clearRecoverableDraft()
+  }
+}
+
+function formatDraftTime(value) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toLocaleString('zh-CN', {
+    hour12: false,
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+async function restoreEditorDraft() {
+  if (!(await confirmDiscardChanges())) {
+    return
+  }
+
+  const raw = window.localStorage.getItem(MENU_EDITOR_DRAFT_KEY)
+  if (!raw) {
+    clearRecoverableDraft()
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+    selector.value = {
+      ...createEmptyMenuSelector(),
+      ...(parsed?.selector || {}),
+    }
+    menuForm.value = normalizeMenuForm(parsed?.menuForm || {})
+    lastSavedLinks.value = {
+      viewUrl: parsed?.lastSavedLinks?.viewUrl || '',
+      shareUrl: parsed?.lastSavedLinks?.shareUrl || '',
+    }
+    currentStep.value = Math.min(Math.max(Number(parsed?.currentStep || 0), 0), 2)
+    dirty.value = parsed?.dirty !== false || hasMenuContent(parsed?.menuForm)
+    editorVisible.value = true
+    loadRecoverableDraft()
+    ElMessage.success('已恢复上次未保存草稿')
+  } catch {
+    clearEditorDraft()
+    clearRecoverableDraft()
+    ElMessage.error('草稿恢复失败，已清除损坏数据')
+  }
+}
+
+function dismissEditorDraft() {
+  clearEditorDraft()
+  clearRecoverableDraft()
 }
 
 function validateImageFile(file) {
@@ -300,7 +439,13 @@ async function openCreateDialog() {
   if (!(await confirmDiscardChanges())) {
     return
   }
-  resetEditor()
+  selector.value = createEmptyMenuSelector()
+  menuForm.value = createEmptyMenuForm()
+  lastSavedLinks.value = { viewUrl: '', shareUrl: '' }
+  currentStep.value = 0
+  dirty.value = false
+  clearEditorDraft()
+  clearRecoverableDraft()
   editorVisible.value = true
 }
 
@@ -427,6 +572,8 @@ async function submitMenu() {
     await refreshMenus()
     currentStep.value = 2
     dirty.value = false
+    clearEditorDraft()
+    clearRecoverableDraft()
     ElMessage.success('餐单保存成功')
   } catch (error) {
     ElMessage.error(error?.message || '餐单保存失败')
@@ -517,6 +664,7 @@ async function handleDialogClose(done) {
 
 onMounted(async () => {
   await Promise.all([loadOptions(), refreshMenus()])
+  loadRecoverableDraft()
   await openMenuFromRoute(route.query.edit)
 })
 
@@ -525,6 +673,17 @@ watch(
   async (value) => {
     await openMenuFromRoute(value)
   },
+)
+
+watch(
+  [editorVisible, selector, menuForm, currentStep, dirty, lastSavedLinks],
+  () => {
+    if (!editorVisible.value) {
+      return
+    }
+    scheduleDraftSave()
+  },
+  { deep: true },
 )
 </script>
 
@@ -537,6 +696,22 @@ watch(
       </div>
     </template>
 
+    <el-alert
+      v-if="recoverableDraft"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="draft-alert"
+    >
+      <template #title>
+        检测到未保存草稿：{{ recoverableDraft.title }}<span v-if="recoverableDraft.savedAt">，保存于 {{ formatDraftTime(recoverableDraft.savedAt) }}</span>
+      </template>
+      <div class="draft-alert__actions">
+        <el-button type="warning" plain size="small" @click="restoreEditorDraft">恢复草稿</el-button>
+        <el-button size="small" @click="dismissEditorDraft">清除草稿</el-button>
+      </div>
+    </el-alert>
+
     <div class="menu-toolbar">
       <div class="menu-toolbar__filters">
         <el-input
@@ -547,6 +722,9 @@ watch(
           @keyup.enter="applyMenuFilters"
           @clear="applyMenuFilters"
         />
+        <el-select v-model="menuFilters.customerId" class="menu-toolbar__select" @change="applyMenuFilters">
+          <el-option v-for="item in customerFilterOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
         <el-select v-model="menuFilters.status" class="menu-toolbar__select" @change="applyMenuFilters">
           <el-option v-for="item in menuStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
@@ -567,6 +745,9 @@ watch(
     </div>
 
     <el-table :data="menus" v-loading="loading" empty-text="没有符合条件的餐单">
+      <el-table-column prop="customerName" label="客户" min-width="120">
+        <template #default="{ row }">{{ row.customerName || '-' }}</template>
+      </el-table-column>
       <el-table-column prop="title" label="餐单标题" min-width="180" />
       <el-table-column prop="menuDate" label="日期" width="140" />
       <el-table-column prop="weekIndex" label="周次" width="90" />
@@ -830,6 +1011,17 @@ watch(
 </template>
 
 <style scoped>
+.draft-alert {
+  margin-bottom: 18px;
+}
+
+.draft-alert__actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .menu-toolbar {
   display: flex;
   align-items: center;

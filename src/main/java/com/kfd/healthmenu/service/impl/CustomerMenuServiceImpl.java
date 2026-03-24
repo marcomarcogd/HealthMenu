@@ -84,6 +84,10 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
             wrapper.eq(CustomerMenu::getStatus, safeQuery.getStatus().trim());
         }
 
+        if (safeQuery.getCustomerId() != null) {
+            wrapper.eq(CustomerMenu::getCustomerId, safeQuery.getCustomerId());
+        }
+
         if (StringUtils.hasText(safeQuery.getKeyword())) {
             String keyword = safeQuery.getKeyword().trim();
             wrapper.and(q -> q.like(CustomerMenu::getTitle, keyword)
@@ -675,6 +679,8 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         CustomerMenuSummaryDto dto = new CustomerMenuSummaryDto();
         dto.setId(menu.getId());
         dto.setCustomerId(menu.getCustomerId());
+        Customer customer = menu.getCustomerId() == null ? null : customerMapper.selectById(menu.getCustomerId());
+        dto.setCustomerName(customer == null ? null : customer.getName());
         dto.setTemplateId(menu.getTemplateId());
         dto.setMenuDate(menu.getMenuDate());
         dto.setWeekIndex(menu.getWeekIndex());

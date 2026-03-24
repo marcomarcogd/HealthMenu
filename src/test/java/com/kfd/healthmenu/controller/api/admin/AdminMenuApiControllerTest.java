@@ -49,11 +49,13 @@ class AdminMenuApiControllerTest {
         CustomerMenuSummaryDto summary = new CustomerMenuSummaryDto();
         summary.setId(7001L);
         summary.setTitle("午餐恢复日");
+        summary.setCustomerName("张三");
         summary.setStatus("DRAFT");
         summary.setStatusLabel("草稿");
         when(customerMenuService.listSummaries(argThat(query ->
                 query != null
                         && "午餐".equals(query.getKeyword())
+                        && 2001L == query.getCustomerId()
                         && "DRAFT".equals(query.getStatus())
                         && "titleAsc".equals(query.getSort())
                         && query.getPage() == 2L
@@ -62,6 +64,7 @@ class AdminMenuApiControllerTest {
 
         mockMvc.perform(get("/api/admin/menus")
                         .param("keyword", "午餐")
+                        .param("customerId", "2001")
                         .param("status", "DRAFT")
                         .param("sort", "titleAsc")
                         .param("page", "2")
@@ -69,6 +72,7 @@ class AdminMenuApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.records[0].title").value("午餐恢复日"))
+                .andExpect(jsonPath("$.data.records[0].customerName").value("张三"))
                 .andExpect(jsonPath("$.data.total").value(6))
                 .andExpect(jsonPath("$.data.page").value(2))
                 .andExpect(jsonPath("$.data.pageSize").value(5));

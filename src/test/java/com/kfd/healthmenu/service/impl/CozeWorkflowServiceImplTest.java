@@ -32,6 +32,22 @@ class CozeWorkflowServiceImplTest {
     }
 
     @Test
+    void buildPayload_shouldUseBlankStringsForOptionalTextFields() {
+        CozeWorkflowServiceImpl service = new CozeWorkflowServiceImpl();
+        CozeWorkflowRequest request = new CozeWorkflowRequest();
+        request.setWorkflowCode("text");
+        request.setSourceText("早餐：燕麦");
+
+        Map<String, Object> payload = ReflectionTestUtils.invokeMethod(service, "buildPayload", request);
+
+        assertThat(payload)
+                .containsEntry("sourceText", "早餐：燕麦")
+                .containsEntry("sourceImageUrl", "")
+                .containsEntry("templateHint", "")
+                .containsEntry("customerName", "");
+    }
+
+    @Test
     void parseResponse_shouldExtractNestedImageUrlAndSuccessFlag() {
         CozeWorkflowServiceImpl service = new CozeWorkflowServiceImpl();
         CozeWorkflowResponse response = new CozeWorkflowResponse();

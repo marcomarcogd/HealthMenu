@@ -123,20 +123,20 @@ public class CozeWorkflowServiceImpl implements CozeWorkflowService {
     private Map<String, Object> buildPayload(CozeWorkflowRequest request) {
         Map<String, Object> payload = new LinkedHashMap<>();
         if (isImageWorkflow(request.getWorkflowCode())) {
-            payload.put("prompt", defaultObject(request.getPrompt()));
-            payload.put("sceneType", defaultObject(request.getSceneType()));
-            payload.put("styleHint", defaultObject(request.getStyleHint()));
+            payload.put("prompt", defaultText(request.getPrompt()));
+            payload.put("sceneType", defaultText(request.getSceneType()));
+            payload.put("styleHint", defaultText(request.getStyleHint()));
             return payload;
         }
         payload.put("sourceText", StringUtils.hasText(request.getSourceText()) ? request.getSourceText() : "");
-        payload.put("sourceImageUrl", defaultObject(request.getSourceImageUrl()));
-        payload.put("templateHint", defaultObject(request.getTemplateHint()));
-        payload.put("customerName", defaultObject(request.getCustomerName()));
+        payload.put("sourceImageUrl", defaultText(request.getSourceImageUrl()));
+        payload.put("templateHint", defaultText(request.getTemplateHint()));
+        payload.put("customerName", defaultText(request.getCustomerName()));
         return payload;
     }
 
-    private Object defaultObject(String value) {
-        return StringUtils.hasText(value) ? value : new LinkedHashMap<>();
+    private String defaultText(String value) {
+        return StringUtils.hasText(value) ? value : "";
     }
 
     private void parseResponse(String body, CozeWorkflowResponse response) {

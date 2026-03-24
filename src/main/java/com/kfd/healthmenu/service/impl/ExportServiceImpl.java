@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.net.URLEncoder;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -28,7 +29,7 @@ public class ExportServiceImpl implements ExportService {
     private final CustomerMenuMealItemMapper mealItemMapper;
 
     @Override
-    public String exportMenuExcel(CustomerMenu menu, HttpServletResponse response) {
+    public byte[] buildMenuExcel(CustomerMenu menu) {
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             XSSFSheet sheet = workbook.createSheet("餐单");
             int rowIndex = 0;
@@ -60,13 +61,31 @@ public class ExportServiceImpl implements ExportService {
                 }
             }
 
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                workbook.write(outputStream);
+                return outputStream.toByteArray();
+            }
+        } catch (Exception ex) {
+            throw new IllegalStateException("导出 Excel 失败", ex);
+        }
+    }
+
+    @Override
+    public String buildMenuExcelFileName(CustomerMenu menu) {
+        return (StringUtils.hasText(menu.getTitle()) ? menu.getTitle().trim() : "餐单") + ".xlsx";
+    }
+
+    @Override
+    public String exportMenuExcel(CustomerMenu menu, HttpServletResponse response) {
+        byte[] workbookBytes = buildMenuExcel(menu);
+        String rawFileName = buildMenuExcelFileName(menu);
+        try {
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            String rawFileName = (StringUtils.hasText(menu.getTitle()) ? menu.getTitle() : "餐单") + ".xlsx";
             String encodedFileName = URLEncoder.encode(rawFileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
             response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encodedFileName);
             ServletOutputStream outputStream = response.getOutputStream();
-            workbook.write(outputStream);
+            outputStream.write(workbookBytes);
             outputStream.flush();
             return rawFileName;
         } catch (Exception ex) {

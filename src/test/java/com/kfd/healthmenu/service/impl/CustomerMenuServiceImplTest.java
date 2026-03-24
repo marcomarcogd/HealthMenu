@@ -18,11 +18,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -270,6 +273,41 @@ class CustomerMenuServiceImplTest {
     }
 
     @Test
+    void publishMenus_shouldPublishDistinctMenusOnce() {
+        Long firstId = saveSimpleMenu("批量发布餐单一", LocalDate.of(2026, 3, 25));
+        Long secondId = saveSimpleMenu("批量发布餐单二", LocalDate.of(2026, 3, 26));
+
+        customerMenuService.publishMenus(List.of(firstId, secondId, firstId));
+
+        assertThat(customerMenuService.getById(firstId).getStatus()).isEqualTo("PUBLISHED");
+        assertThat(customerMenuService.getById(secondId).getStatus()).isEqualTo("PUBLISHED");
+        assertThat(menuPublishRecordMapper.selectList(null))
+                .filteredOn(item -> List.of(firstId, secondId).contains(item.getCustomerMenuId()))
+                .filteredOn(item -> "SHARE_LINK".equals(item.getExportType()))
+                .hasSize(2);
+    }
+
+    @Test
+    void exportMenusExcel_shouldWriteZipAndRecordEachMenu() throws Exception {
+        Long firstId = saveSimpleMenu("批量导出餐单一", LocalDate.of(2026, 3, 27));
+        Long secondId = saveSimpleMenu("批量导出餐单二", LocalDate.of(2026, 3, 28));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        customerMenuService.exportMenusExcel(List.of(firstId, secondId), response);
+
+        assertThat(response.getContentType()).isEqualTo("application/zip");
+        try (ZipInputStream zipInputStream = new ZipInputStream(new ByteArrayInputStream(response.getContentAsByteArray()))) {
+            assertThat(zipInputStream.getNextEntry()).isNotNull();
+            assertThat(zipInputStream.getNextEntry()).isNotNull();
+            assertThat(zipInputStream.getNextEntry()).isNull();
+        }
+        assertThat(menuPublishRecordMapper.selectList(null))
+                .filteredOn(item -> List.of(firstId, secondId).contains(item.getCustomerMenuId()))
+                .filteredOn(item -> "EXCEL".equals(item.getExportType()))
+                .hasSize(2);
+    }
+
+    @Test
     void deleteById_shouldDeleteMenuAndSnapshots() {
         CustomerMenuForm form = new CustomerMenuForm();
         form.setCustomerId(2001L);
@@ -299,5 +337,14 @@ class CustomerMenuServiceImplTest {
         assertThat(menuPublishRecordMapper.selectList(null))
                 .filteredOn(item -> menuId.equals(item.getCustomerMenuId()))
                 .isEmpty();
+    }
+
+    private Long saveSimpleMenu(String title, LocalDate menuDate) {
+        CustomerMenuForm form = new CustomerMenuForm();
+        form.setCustomerId(2001L);
+        form.setTemplateId(1001L);
+        form.setMenuDate(menuDate);
+        form.setTitle(title);
+        return customerMenuService.saveMenu(form);
     }
 }

@@ -16,6 +16,9 @@ export const saveMenu = (payload) => request.post('/menus', {
 export const parseMenuText = (sourceText) => request.post('/menus/ai/parse', { sourceText })
 export const generateMenuImage = (prompt) => request.post('/menus/ai/generate-image', { prompt })
 export const publishMenu = (id) => request.post(`/menus/${id}/publish`)
+export const publishMenus = (ids) => request.post('/menus/batch/publish', {
+  ids: normalizeIds(ids),
+})
 export const deleteMenu = (id) => request.delete(`/menus/${id}`)
 export const uploadMenuImage = (file) => {
   const formData = new FormData()
@@ -37,23 +40,46 @@ export async function downloadMenuExcel(id) {
     const response = await downloadClient.get(`/menus/${id}/export/excel`, {
       responseType: 'blob',
     })
-
-    const blob = new Blob([response.data], {
-      type: response.headers['content-type'] || 'application/octet-stream',
-    })
-    const fileName = resolveFileName(response.headers['content-disposition']) || `menu-${id}.xlsx`
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
+    triggerBlobDownload(response.data, response.headers, `menu-${id}.xlsx`)
   } catch (error) {
     const message = await resolveDownloadError(error)
     throw new Error(message)
   }
+}
+
+export async function downloadMenusExcel(ids) {
+  try {
+    const response = await downloadClient.post('/menus/batch/export/excel', {
+      ids: normalizeIds(ids),
+    }, {
+      responseType: 'blob',
+    })
+    triggerBlobDownload(response.data, response.headers, 'menu-batch-export.zip')
+  } catch (error) {
+    const message = await resolveDownloadError(error)
+    throw new Error(message)
+  }
+}
+
+function normalizeIds(ids = []) {
+  return ids
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0)
+}
+
+function triggerBlobDownload(data, headers = {}, fallbackName) {
+  const blob = new Blob([data], {
+    type: headers['content-type'] || 'application/octet-stream',
+  })
+  const fileName = resolveFileName(headers['content-disposition']) || fallbackName
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
 
 function resolveFileName(contentDisposition) {

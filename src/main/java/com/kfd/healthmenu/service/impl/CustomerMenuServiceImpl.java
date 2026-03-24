@@ -40,12 +40,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -307,13 +314,15 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
     @Transactional
     public void publishMenu(Long id) {
         CustomerMenu menu = requireMenu(id);
-        if (!StringUtils.hasText(menu.getShareToken())) {
-            menu.setShareToken(UUID.randomUUID().toString().replace("-", ""));
+        publishMenuInternal(menu);
+    }
+
+    @Override
+    @Transactional
+    public void publishMenus(List<Long> ids) {
+        for (CustomerMenu menu : requireMenus(ids)) {
+            publishMenuInternal(menu);
         }
-        menu.setStatus(RecordStatus.PUBLISHED.name());
-        customerMenuMapper.updateById(menu);
-        String recordName = StringUtils.hasText(menu.getTitle()) ? menu.getTitle() + "-share-link" : "menu-share-link";
-        recordPublish(menu.getId(), ExportType.SHARE_LINK, buildShareUrl(menu.getShareToken()), recordName, DEFAULT_OPERATOR);
     }
 
     @Override
@@ -322,6 +331,28 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         CustomerMenu menu = requireMenu(id);
         String fileName = exportService.exportMenuExcel(menu, response);
         recordPublish(menu.getId(), ExportType.EXCEL, null, fileName, DEFAULT_OPERATOR);
+    }
+
+    @Override
+    @Transactional
+    public void exportMenusExcel(List<Long> ids, HttpServletResponse response) {
+        List<CustomerMenu> menus = requireMenus(ids);
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''menu-batch-export.zip");
+
+        Set<String> usedEntryNames = new HashSet<>();
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(response.getOutputStream())) {
+            for (CustomerMenu menu : menus) {
+                String entryName = resolveUniqueEntryName(usedEntryNames, exportService.buildMenuExcelFileName(menu));
+                zipOutputStream.putNextEntry(new ZipEntry(entryName));
+                zipOutputStream.write(exportService.buildMenuExcel(menu));
+                zipOutputStream.closeEntry();
+                recordPublish(menu.getId(), ExportType.EXCEL, null, entryName, DEFAULT_OPERATOR);
+            }
+            zipOutputStream.finish();
+        } catch (IOException ex) {
+            throw new IllegalStateException("批量导出 Excel 失败", ex);
+        }
     }
 
     @Override
@@ -724,6 +755,61 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
             throw new BizException("MENU_NOT_FOUND", "未找到对应的餐单");
         }
         return menu;
+    }
+
+    private List<CustomerMenu> requireMenus(List<Long> ids) {
+        List<Long> safeIds = ids == null ? Collections.emptyList() : ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (safeIds.isEmpty()) {
+            throw new BizException("MENU_IDS_REQUIRED", "请至少选择一条餐单");
+        }
+
+        List<CustomerMenu> menus = customerMenuMapper.selectBatchIds(safeIds).stream()
+                .filter(item -> item.getDeleted() == null || item.getDeleted() == 0)
+                .toList();
+        if (menus.size() != safeIds.size()) {
+            throw new BizException("MENU_NOT_FOUND", "部分餐单不存在或已删除");
+        }
+
+        Map<Long, CustomerMenu> menuMap = new LinkedHashMap<>();
+        for (CustomerMenu menu : menus) {
+            menuMap.put(menu.getId(), menu);
+        }
+        return safeIds.stream().map(menuMap::get).toList();
+    }
+
+    private void publishMenuInternal(CustomerMenu menu) {
+        if (!StringUtils.hasText(menu.getShareToken())) {
+            menu.setShareToken(UUID.randomUUID().toString().replace("-", ""));
+        }
+        menu.setStatus(RecordStatus.PUBLISHED.name());
+        customerMenuMapper.updateById(menu);
+        String recordName = StringUtils.hasText(menu.getTitle()) ? menu.getTitle() + "-share-link" : "menu-share-link";
+        recordPublish(menu.getId(), ExportType.SHARE_LINK, buildShareUrl(menu.getShareToken()), recordName, DEFAULT_OPERATOR);
+    }
+
+    private String resolveUniqueEntryName(Set<String> usedEntryNames, String rawFileName) {
+        String safeFileName = sanitizeFileName(rawFileName);
+        if (usedEntryNames.add(safeFileName)) {
+            return safeFileName;
+        }
+
+        int suffix = 2;
+        int dotIndex = safeFileName.lastIndexOf('.');
+        String baseName = dotIndex >= 0 ? safeFileName.substring(0, dotIndex) : safeFileName;
+        String extension = dotIndex >= 0 ? safeFileName.substring(dotIndex) : "";
+        String candidate = safeFileName;
+        while (!usedEntryNames.add(candidate)) {
+            candidate = baseName + "-" + suffix++ + extension;
+        }
+        return candidate;
+    }
+
+    private String sanitizeFileName(String rawFileName) {
+        String fileName = StringUtils.hasText(rawFileName) ? rawFileName.trim() : "餐单.xlsx";
+        return fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
     private void recordPublish(Long menuId, ExportType exportType, String filePath, String fileName, String operatorName) {

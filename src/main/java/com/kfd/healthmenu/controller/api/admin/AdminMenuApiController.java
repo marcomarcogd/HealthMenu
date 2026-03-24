@@ -5,6 +5,7 @@ import com.kfd.healthmenu.dto.CustomerMenuForm;
 import com.kfd.healthmenu.dto.api.AiImageResponse;
 import com.kfd.healthmenu.dto.api.ApiResponse;
 import com.kfd.healthmenu.dto.api.IdResponse;
+import com.kfd.healthmenu.dto.api.IdsRequest;
 import com.kfd.healthmenu.dto.api.PageResult;
 import com.kfd.healthmenu.dto.menu.AiImageGenerateRequest;
 import com.kfd.healthmenu.dto.menu.AiMenuParseRequest;
@@ -62,9 +63,20 @@ public class AdminMenuApiController {
         return ApiResponse.success("餐单已发布", null);
     }
 
+    @PostMapping("/batch/publish")
+    public ApiResponse<Void> batchPublish(@Valid @RequestBody IdsRequest request) {
+        customerMenuService.publishMenus(request.getIds());
+        return ApiResponse.success("已批量发布餐单", null);
+    }
+
     @GetMapping("/{id}/export/excel")
     public void exportExcel(@PathVariable Long id, HttpServletResponse response) {
         customerMenuService.exportMenuExcel(id, response);
+    }
+
+    @PostMapping("/batch/export/excel")
+    public void batchExportExcel(@Valid @RequestBody IdsRequest request, HttpServletResponse response) {
+        customerMenuService.exportMenusExcel(request.getIds(), response);
     }
 
     @DeleteMapping("/{id}")

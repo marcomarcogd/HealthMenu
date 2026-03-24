@@ -209,11 +209,41 @@ class AdminMenuApiControllerTest {
     }
 
     @Test
+    void batchPublish_shouldReturnSuccess() throws Exception {
+        mockMvc.perform(post("/api/admin/menus/batch/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ids": [7001, 7002]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("已批量发布餐单"));
+
+        verify(customerMenuService).publishMenus(List.of(7001L, 7002L));
+    }
+
+    @Test
     void exportExcel_shouldDelegateToService() throws Exception {
         mockMvc.perform(get("/api/admin/menus/7001/export/excel"))
                 .andExpect(status().isOk());
 
         verify(customerMenuService).exportMenuExcel(org.mockito.ArgumentMatchers.eq(7001L), any(HttpServletResponse.class));
+    }
+
+    @Test
+    void batchExportExcel_shouldDelegateToService() throws Exception {
+        mockMvc.perform(post("/api/admin/menus/batch/export/excel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ids": [7001, 7002]
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        verify(customerMenuService).exportMenusExcel(org.mockito.ArgumentMatchers.eq(List.of(7001L, 7002L)), any(HttpServletResponse.class));
     }
 
     @Test

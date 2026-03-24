@@ -6,12 +6,14 @@ import { getAdminOptions } from '../api/options'
 import {
   deleteMenu,
   downloadMenuExcel,
+  downloadMenusExcel,
   generateMenuImage,
   getMenuDetail,
   initMenuForm,
   listMenus,
   parseMenuText,
   publishMenu,
+  publishMenus,
   saveMenu,
   uploadMenuImage,
 } from '../api/menu'
@@ -25,14 +27,18 @@ import {
 } from '../utils/menu-form'
 import { copyText } from '../utils/clipboard'
 
-const MENU_EDITOR_DRAFT_KEY = 'healthmenu.menu-editor-draft'
+const MENU_EDITOR_DRAFT_NAMESPACE = 'healthmenu.menu-editor-draft'
+const MENU_EDITOR_DRAFT_INDEX_KEY = `${MENU_EDITOR_DRAFT_NAMESPACE}:index`
 
 const route = useRoute()
 const router = useRouter()
 const menus = ref([])
+const selectedMenuIds = ref([])
+const selectedMenuRows = ref([])
 const loading = ref(false)
 const formLoading = ref(false)
 const saving = ref(false)
+const batchActionLoading = ref(false)
 const editorVisible = ref(false)
 const currentStep = ref(0)
 const options = ref({ customers: [], templates: [], recordStatuses: [] })
@@ -44,7 +50,8 @@ const generatingImageTarget = ref(null)
 const routeEditLoading = ref(false)
 const appBaseUrl = window.location.origin
 const autosaveHandle = ref(null)
-const recoverableDraft = ref(null)
+const activeDraftKey = ref('')
+const recoverableDrafts = ref([])
 const pagination = ref({
   page: 1,
   pageSize: 10,
@@ -72,6 +79,10 @@ const customerFilterOptions = computed(() => [
     value: item.value,
   })),
 ])
+const hasSelectedMenus = computed(() => selectedMenuIds.value.length > 0)
+const selectedPublishableIds = computed(() => selectedMenuRows.value
+  .filter((item) => canPublish(item))
+  .map((item) => item.id))
 const menuSummary = computed(() => {
   const total = pagination.value.total
   const visible = menus.value.length
@@ -79,6 +90,13 @@ const menuSummary = computed(() => {
   const drafts = visible - published
 
   return { total, visible, published, drafts }
+})
+const draftAlertTitle = computed(() => {
+  const count = recoverableDrafts.value.length
+  if (!count) {
+    return ''
+  }
+  return count === 1 ? '检测到 1 份未保存草稿' : `检测到 ${count} 份未保存草稿`
 })
 
 async function refreshMenus(targetPage = pagination.value.page) {
@@ -101,6 +119,8 @@ async function refreshMenus(targetPage = pagination.value.page) {
     }
 
     menus.value = result?.records || []
+    selectedMenuIds.value = []
+    selectedMenuRows.value = []
     pagination.value = {
       ...pagination.value,
       page: Number(result?.page || targetPage || 1),
@@ -126,7 +146,6 @@ function resetEditor() {
   lastSavedLinks.value = { viewUrl: '', shareUrl: '' }
   currentStep.value = 0
   dirty.value = false
-  clearRecoverableDraft()
   clearEditorDraft()
 }
 
@@ -201,8 +220,31 @@ function handlePageSizeChange(pageSize) {
   refreshMenus(1)
 }
 
+function handleSelectionChange(rows = []) {
+  selectedMenuRows.value = rows
+  selectedMenuIds.value = rows.map((item) => item.id).filter(Boolean)
+}
+
+function createDraftStorageKey() {
+  return `${MENU_EDITOR_DRAFT_NAMESPACE}:new:${Date.now()}`
+}
+
+function resolveCurrentDraftKey({ createIfMissing = true } = {}) {
+  if (menuForm.value.id) {
+    activeDraftKey.value = `${MENU_EDITOR_DRAFT_NAMESPACE}:${menuForm.value.id}`
+    return activeDraftKey.value
+  }
+  if (!activeDraftKey.value && createIfMissing) {
+    activeDraftKey.value = createDraftStorageKey()
+  }
+  return activeDraftKey.value
+}
+
 function buildDraftPayload() {
+  const storageKey = resolveCurrentDraftKey()
   return {
+    storageKey,
+    menuId: menuForm.value.id || null,
     selector: selector.value,
     menuForm: menuForm.value,
     lastSavedLinks: lastSavedLinks.value,
@@ -212,16 +254,81 @@ function buildDraftPayload() {
   }
 }
 
+function readDraftIndex() {
+  const raw = window.localStorage.getItem(MENU_EDITOR_DRAFT_INDEX_KEY)
+  if (!raw) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    window.localStorage.removeItem(MENU_EDITOR_DRAFT_INDEX_KEY)
+    return []
+  }
+}
+
+function writeDraftIndex(entries) {
+  if (!entries.length) {
+    window.localStorage.removeItem(MENU_EDITOR_DRAFT_INDEX_KEY)
+    return
+  }
+  window.localStorage.setItem(MENU_EDITOR_DRAFT_INDEX_KEY, JSON.stringify(entries))
+}
+
+function syncRecoverableDrafts() {
+  const entries = readDraftIndex()
+    .map((entry) => {
+      const storageKey = entry?.storageKey
+      if (!storageKey) {
+        return null
+      }
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) {
+        return null
+      }
+
+      try {
+        const parsed = JSON.parse(raw)
+        return {
+          storageKey,
+          menuId: parsed?.menuId || entry?.menuId || null,
+          title: parsed?.menuForm?.title || entry?.title || '未命名草稿',
+          savedAt: parsed?.savedAt || entry?.savedAt || '',
+        }
+      } catch {
+        window.localStorage.removeItem(storageKey)
+        return null
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.savedAt || 0).getTime() - new Date(a.savedAt || 0).getTime())
+
+  writeDraftIndex(entries)
+  recoverableDrafts.value = entries
+}
+
 function saveEditorDraft() {
   if (!editorVisible.value || !hasMenuContent(menuForm.value)) {
     return
   }
-
-  window.localStorage.setItem(MENU_EDITOR_DRAFT_KEY, JSON.stringify(buildDraftPayload()))
-  recoverableDraft.value = {
-    savedAt: new Date().toISOString(),
-    title: menuForm.value.title || '未命名草稿',
+  if (menuForm.value.id && !dirty.value) {
+    return
   }
+
+  const payload = buildDraftPayload()
+  window.localStorage.setItem(payload.storageKey, JSON.stringify(payload))
+  const nextEntries = readDraftIndex()
+    .filter((entry) => entry?.storageKey !== payload.storageKey)
+  nextEntries.unshift({
+    storageKey: payload.storageKey,
+    menuId: payload.menuId,
+    title: payload.menuForm?.title || '未命名草稿',
+    savedAt: payload.savedAt,
+  })
+  writeDraftIndex(nextEntries)
+  syncRecoverableDrafts()
 }
 
 function scheduleDraftSave() {
@@ -235,35 +342,22 @@ function scheduleDraftSave() {
   }, 500)
 }
 
-function clearEditorDraft() {
+function clearEditorDraft(storageKeyOverride = '') {
+  const storageKey = storageKeyOverride || resolveCurrentDraftKey({ createIfMissing: false })
   if (autosaveHandle.value) {
     window.clearTimeout(autosaveHandle.value)
     autosaveHandle.value = null
   }
-  window.localStorage.removeItem(MENU_EDITOR_DRAFT_KEY)
+  if (storageKey) {
+    window.localStorage.removeItem(storageKey)
+    writeDraftIndex(readDraftIndex().filter((entry) => entry?.storageKey !== storageKey))
+  }
+  activeDraftKey.value = ''
+  syncRecoverableDrafts()
 }
 
-function clearRecoverableDraft() {
-  recoverableDraft.value = null
-}
-
-function loadRecoverableDraft() {
-  const raw = window.localStorage.getItem(MENU_EDITOR_DRAFT_KEY)
-  if (!raw) {
-    recoverableDraft.value = null
-    return
-  }
-
-  try {
-    const parsed = JSON.parse(raw)
-    recoverableDraft.value = {
-      savedAt: parsed?.savedAt || '',
-      title: parsed?.menuForm?.title || '未命名草稿',
-    }
-  } catch {
-    clearEditorDraft()
-    clearRecoverableDraft()
-  }
+function loadRecoverableDrafts() {
+  syncRecoverableDrafts()
 }
 
 function formatDraftTime(value) {
@@ -285,14 +379,24 @@ function formatDraftTime(value) {
   })
 }
 
-async function restoreEditorDraft() {
+async function restoreEditorDraft(draft) {
   if (!(await confirmDiscardChanges())) {
     return
   }
 
-  const raw = window.localStorage.getItem(MENU_EDITOR_DRAFT_KEY)
+  const storageKey = draft?.storageKey
+  if (!storageKey) {
+    syncRecoverableDrafts()
+    return
+  }
+  const currentStorageKey = resolveCurrentDraftKey({ createIfMissing: false })
+  if (currentStorageKey && currentStorageKey !== storageKey) {
+    clearEditorDraft(currentStorageKey)
+  }
+
+  const raw = window.localStorage.getItem(storageKey)
   if (!raw) {
-    clearRecoverableDraft()
+    dismissEditorDraft(draft)
     return
   }
 
@@ -309,19 +413,27 @@ async function restoreEditorDraft() {
     }
     currentStep.value = Math.min(Math.max(Number(parsed?.currentStep || 0), 0), 2)
     dirty.value = parsed?.dirty !== false || hasMenuContent(parsed?.menuForm)
+    activeDraftKey.value = storageKey
     editorVisible.value = true
-    loadRecoverableDraft()
+    syncRecoverableDrafts()
     ElMessage.success('已恢复上次未保存草稿')
   } catch {
-    clearEditorDraft()
-    clearRecoverableDraft()
+    dismissEditorDraft(draft)
     ElMessage.error('草稿恢复失败，已清除损坏数据')
   }
 }
 
-function dismissEditorDraft() {
-  clearEditorDraft()
-  clearRecoverableDraft()
+function dismissEditorDraft(draft) {
+  const storageKey = draft?.storageKey || resolveCurrentDraftKey({ createIfMissing: false })
+  if (!storageKey) {
+    return
+  }
+  window.localStorage.removeItem(storageKey)
+  writeDraftIndex(readDraftIndex().filter((entry) => entry?.storageKey !== storageKey))
+  if (activeDraftKey.value === storageKey) {
+    activeDraftKey.value = ''
+  }
+  syncRecoverableDrafts()
 }
 
 function validateImageFile(file) {
@@ -439,13 +551,13 @@ async function openCreateDialog() {
   if (!(await confirmDiscardChanges())) {
     return
   }
+  clearEditorDraft()
   selector.value = createEmptyMenuSelector()
   menuForm.value = createEmptyMenuForm()
+  activeDraftKey.value = createDraftStorageKey()
   lastSavedLinks.value = { viewUrl: '', shareUrl: '' }
   currentStep.value = 0
   dirty.value = false
-  clearEditorDraft()
-  clearRecoverableDraft()
   editorVisible.value = true
 }
 
@@ -498,6 +610,7 @@ async function editMenu(row) {
   if (!(await confirmDiscardChanges())) {
     return
   }
+  clearEditorDraft()
 
   formLoading.value = true
   try {
@@ -506,6 +619,7 @@ async function editMenu(row) {
       throw new Error('餐单不存在或已删除')
     }
     menuForm.value = normalizeMenuForm(detail)
+    activeDraftKey.value = `${MENU_EDITOR_DRAFT_NAMESPACE}:${detail.id}`
     selector.value.customerId = detail.customerId
     selector.value.templateId = detail.templateId
     lastSavedLinks.value = {
@@ -539,6 +653,22 @@ async function openMenuFromRoute(menuId) {
   }
 }
 
+async function refreshActiveMenuDetail(menuIds = []) {
+  if (!menuForm.value.id || !menuIds.includes(menuForm.value.id)) {
+    return
+  }
+
+  const detail = normalizeMenuForm(await getMenuDetail(menuForm.value.id))
+  if (!detail?.id) {
+    throw new Error('餐单操作成功，但重新加载详情失败')
+  }
+  menuForm.value = detail
+  lastSavedLinks.value = {
+    viewUrl: detail.viewUrl || '',
+    shareUrl: detail.shareUrl || '',
+  }
+}
+
 function nextStep() {
   if (!hasStepOneContent.value) {
     ElMessage.warning('当前餐单还没有可编辑内容')
@@ -558,6 +688,7 @@ async function submitMenu() {
   }
   saving.value = true
   try {
+    const currentDraftStorageKey = resolveCurrentDraftKey({ createIfMissing: false })
     const result = await saveMenu(normalizeMenuSavePayload(menuForm.value))
     menuForm.value.id = result.id
     const detail = normalizeMenuForm(await getMenuDetail(result.id))
@@ -572,8 +703,7 @@ async function submitMenu() {
     await refreshMenus()
     currentStep.value = 2
     dirty.value = false
-    clearEditorDraft()
-    clearRecoverableDraft()
+    clearEditorDraft(currentDraftStorageKey)
     ElMessage.success('餐单保存成功')
   } catch (error) {
     ElMessage.error(error?.message || '餐单保存失败')
@@ -597,17 +727,7 @@ async function publishCurrentMenu(row) {
     await publishMenu(row.id)
     ElMessage.success('餐单已发布')
     await refreshMenus()
-    if (menuForm.value.id === row.id) {
-      const detail = normalizeMenuForm(await getMenuDetail(row.id))
-      if (!detail?.id) {
-        throw new Error('餐单已发布，但重新加载详情失败')
-      }
-      menuForm.value = detail
-      lastSavedLinks.value = {
-        viewUrl: detail.viewUrl || '',
-        shareUrl: detail.shareUrl || '',
-      }
-    }
+    await refreshActiveMenuDetail([row.id])
   } catch (error) {
     ElMessage.error(error?.message || '发布失败')
   }
@@ -619,6 +739,53 @@ async function exportExcel(row) {
     ElMessage.success('Excel 导出已开始')
   } catch (error) {
     ElMessage.error(error?.message || '导出失败')
+  }
+}
+
+async function publishSelectedMenus() {
+  const ids = selectedPublishableIds.value
+  if (!ids.length) {
+    ElMessage.warning('请选择至少一条未发布餐单')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(`确认批量发布 ${ids.length} 份餐单吗？`, '批量发布确认', {
+      type: 'warning',
+      confirmButtonText: '立即批量发布',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+
+  batchActionLoading.value = true
+  try {
+    await publishMenus(ids)
+    ElMessage.success(`已批量发布 ${ids.length} 份餐单`)
+    await refreshMenus()
+    await refreshActiveMenuDetail(ids)
+  } catch (error) {
+    ElMessage.error(error?.message || '批量发布失败')
+  } finally {
+    batchActionLoading.value = false
+  }
+}
+
+async function exportSelectedMenus() {
+  if (!selectedMenuIds.value.length) {
+    ElMessage.warning('请先选择需要导出的餐单')
+    return
+  }
+
+  batchActionLoading.value = true
+  try {
+    await downloadMenusExcel(selectedMenuIds.value)
+    ElMessage.success(`已开始导出 ${selectedMenuIds.value.length} 份餐单`)
+  } catch (error) {
+    ElMessage.error(error?.message || '批量导出失败')
+  } finally {
+    batchActionLoading.value = false
   }
 }
 
@@ -664,7 +831,7 @@ async function handleDialogClose(done) {
 
 onMounted(async () => {
   await Promise.all([loadOptions(), refreshMenus()])
-  loadRecoverableDraft()
+  loadRecoverableDrafts()
   await openMenuFromRoute(route.query.edit)
 })
 
@@ -697,18 +864,27 @@ watch(
     </template>
 
     <el-alert
-      v-if="recoverableDraft"
+      v-if="recoverableDrafts.length"
       type="warning"
       :closable="false"
       show-icon
       class="draft-alert"
     >
       <template #title>
-        检测到未保存草稿：{{ recoverableDraft.title }}<span v-if="recoverableDraft.savedAt">，保存于 {{ formatDraftTime(recoverableDraft.savedAt) }}</span>
+        {{ draftAlertTitle }}
       </template>
-      <div class="draft-alert__actions">
-        <el-button type="warning" plain size="small" @click="restoreEditorDraft">恢复草稿</el-button>
-        <el-button size="small" @click="dismissEditorDraft">清除草稿</el-button>
+      <div class="draft-alert__list">
+        <div v-for="draft in recoverableDrafts" :key="draft.storageKey" class="draft-alert__item">
+          <span>
+            {{ draft.title }}
+            <span v-if="draft.menuId"> · 餐单 #{{ draft.menuId }}</span>
+            <span v-if="draft.savedAt"> · 保存于 {{ formatDraftTime(draft.savedAt) }}</span>
+          </span>
+          <div class="draft-alert__actions">
+            <el-button type="warning" plain size="small" @click="restoreEditorDraft(draft)">恢复草稿</el-button>
+            <el-button size="small" @click="dismissEditorDraft(draft)">清除草稿</el-button>
+          </div>
+        </div>
       </div>
     </el-alert>
 
@@ -737,14 +913,40 @@ watch(
         <el-button type="primary" plain @click="applyMenuFilters">查询</el-button>
         <el-button plain @click="resetMenuFilters">清空筛选</el-button>
       </div>
+      <div class="menu-toolbar__actions">
+        <el-button
+          type="warning"
+          plain
+          :disabled="!selectedPublishableIds.length || batchActionLoading"
+          :loading="batchActionLoading"
+          @click="publishSelectedMenus"
+        >
+          批量发布
+        </el-button>
+        <el-button
+          plain
+          :disabled="!hasSelectedMenus || batchActionLoading"
+          :loading="batchActionLoading"
+          @click="exportSelectedMenus"
+        >
+          批量导出
+        </el-button>
+      </div>
       <div class="menu-toolbar__summary">
         <span>当前显示 {{ menuSummary.visible }} / {{ menuSummary.total }}</span>
+        <span>已选 {{ selectedMenuIds.length }}</span>
         <span>草稿 {{ menuSummary.drafts }}</span>
         <span>已发布 {{ menuSummary.published }}</span>
       </div>
     </div>
 
-    <el-table :data="menus" v-loading="loading" empty-text="没有符合条件的餐单">
+    <el-table
+      :data="menus"
+      v-loading="loading"
+      empty-text="没有符合条件的餐单"
+      @selection-change="handleSelectionChange"
+    >
+      <el-table-column type="selection" width="48" />
       <el-table-column prop="customerName" label="客户" min-width="120">
         <template #default="{ row }">{{ row.customerName || '-' }}</template>
       </el-table-column>
@@ -1015,8 +1217,22 @@ watch(
   margin-bottom: 18px;
 }
 
-.draft-alert__actions {
+.draft-alert__list {
   margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.draft-alert__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.draft-alert__actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -1037,6 +1253,13 @@ watch(
   gap: 12px;
   flex-wrap: wrap;
   flex: 1;
+}
+
+.menu-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .menu-toolbar__search {
@@ -1066,6 +1289,7 @@ watch(
 @media (max-width: 900px) {
   .menu-toolbar,
   .menu-toolbar__filters,
+  .menu-toolbar__actions,
   .menu-toolbar__summary {
     align-items: stretch;
     flex-direction: column;

@@ -31,7 +31,11 @@ public interface CustomerMenuService {
 
     void publishMenu(Long id);
 
+    void publishMenus(List<Long> ids);
+
     void exportMenuExcel(Long id, HttpServletResponse response);
+
+    void exportMenusExcel(List<Long> ids, HttpServletResponse response);
 
     void deleteById(Long id);
 }

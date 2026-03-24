@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS customer (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS menu_template (
     id BIGINT PRIMARY KEY,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS menu_template (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS menu_template_section (
     id BIGINT PRIMARY KEY,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS menu_template_section (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS menu_template_meal (
     id BIGINT PRIMARY KEY,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS menu_template_meal (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS menu_template_meal_item (
     id BIGINT PRIMARY KEY,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS menu_template_meal_item (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_menu (
     id BIGINT PRIMARY KEY,
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS customer_menu (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_menu_section_content (
     id BIGINT PRIMARY KEY,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS customer_menu_section_content (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_menu_meal (
     id BIGINT PRIMARY KEY,
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS customer_menu_meal (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS customer_menu_meal_item (
     id BIGINT PRIMARY KEY,
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS customer_menu_meal_item (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS menu_publish_record (
     id BIGINT PRIMARY KEY,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS menu_publish_record (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS ai_import_record (
     id BIGINT PRIMARY KEY,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS ai_import_record (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sys_dict_type (
     id BIGINT PRIMARY KEY,
@@ -165,7 +165,7 @@ CREATE TABLE IF NOT EXISTS sys_dict_type (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sys_dict_item (
     id BIGINT PRIMARY KEY,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS sys_dict_item (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO menu_template (id, name, description, is_default, theme_code, cover_image_path, title_rule, status, create_time, update_time, deleted)
 VALUES (1001, '标准模板', '默认模板，含专属标题、每周提示、互换指南与每日餐单', 1, 'standard', NULL, '{{customerName}}专属餐单', 1, NOW(), NOW(), 0)
@@ -224,4 +224,3 @@ VALUES
     (3061, 2007, 'PLAIN_TEXT', '纯文本', 'PLAIN_TEXT', 1, 1, 1, NOW(), NOW(), 0),
     (3062, 2007, 'RICH_TEXT', '富文本', 'RICH_TEXT', 2, 1, 1, NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE update_time = NOW();
-

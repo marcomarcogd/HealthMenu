@@ -7,6 +7,7 @@ spring:
   sql:
     init:
       mode: ${HEALTH_MENU_SQL_INIT_MODE:never}
+      encoding: UTF-8
       schema-locations: classpath:/sql/schema.sql
       data-locations: classpath:/sql/data.sql
 

@@ -46,13 +46,18 @@ Create a database named `health_menu` before starting the backend, or override t
 Recommended variables:
 
 ```powershell
-$env:HEALTH_MENU_DB_URL="jdbc:mysql://localhost:3306/health_menu?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
+$env:HEALTH_MENU_DB_URL="jdbc:mysql://localhost:3306/health_menu?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai"
 $env:HEALTH_MENU_DB_USERNAME="root"
 $env:HEALTH_MENU_DB_PASSWORD=""
 $env:HEALTH_MENU_SQL_INIT_MODE="always"
 $env:APP_AI_IMPORT_ENABLED="false"
 $env:APP_AI_IMPORT_PROVIDER="mock"
 ```
+
+Recommended database defaults:
+
+- Database charset: `utf8mb4`
+- Database collation: `utf8mb4_unicode_ci`
 
 Optional share and upload overrides:
 

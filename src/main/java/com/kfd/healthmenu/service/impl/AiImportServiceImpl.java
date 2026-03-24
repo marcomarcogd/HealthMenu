@@ -1,6 +1,7 @@
 package com.kfd.healthmenu.service.impl;
 
 import cn.hutool.json.JSONUtil;
+import com.kfd.healthmenu.common.BizException;
 import com.kfd.healthmenu.dto.AiImportResultDto;
 import com.kfd.healthmenu.dto.CozeWorkflowRequest;
 import com.kfd.healthmenu.dto.CozeWorkflowResponse;
@@ -53,7 +54,7 @@ public class AiImportServiceImpl implements AiImportService {
             return parsed;
         }
 
-        return heuristicByText(sourceText, "AI 未返回可用的结构化结果，已按文本规则提取");
+        return heuristicByText(sourceText, resolveTextFallbackMessage(response));
     }
 
     @Override
@@ -65,10 +66,17 @@ public class AiImportServiceImpl implements AiImportService {
         request.setStyleHint(imageStyleHint);
 
         CozeWorkflowResponse response = cozeWorkflowService.execute(request);
-        if (Boolean.TRUE.equals(response.getSuccess()) && StringUtils.hasText(response.getImageUrl())) {
-            return fileStorageService.downloadToLocal(response.getImageUrl(), ".png");
+        if (!Boolean.TRUE.equals(response.getSuccess())) {
+            throw new BizException("AI_IMAGE_FAILED", resolveImageFailureMessage(response));
         }
-        return null;
+        if (!StringUtils.hasText(response.getImageUrl())) {
+            throw new BizException("AI_IMAGE_FAILED", "Coze 生图成功但未返回可用图片地址，请检查工作流输出字段");
+        }
+        try {
+            return fileStorageService.downloadToLocal(response.getImageUrl(), null);
+        } catch (Exception ex) {
+            throw new BizException("AI_IMAGE_FAILED", "Coze 图片已生成，但保存到本地失败：" + ex.getMessage());
+        }
     }
 
     private AiImportResultDto parseCozeResponse(CozeWorkflowResponse response, String sourceText) {
@@ -95,6 +103,30 @@ public class AiImportServiceImpl implements AiImportService {
         }
 
         return null;
+    }
+
+    private String resolveTextFallbackMessage(CozeWorkflowResponse response) {
+        String defaultMessage = "AI 未返回可用的结构化结果，已按文本规则提取";
+        if (response == null) {
+            return defaultMessage;
+        }
+        String detail = firstNonBlank(response.getErrorMessage(), response.getRawResponse());
+        if (!StringUtils.hasText(detail)) {
+            return defaultMessage;
+        }
+        return defaultMessage + "。原因：" + truncate(detail.replaceAll("\\s+", " ").trim(), 80);
+    }
+
+    private String resolveImageFailureMessage(CozeWorkflowResponse response) {
+        String defaultMessage = "AI 生图失败，请稍后重试或改用手动上传";
+        if (response == null) {
+            return defaultMessage;
+        }
+        String detail = firstNonBlank(response.getErrorMessage(), response.getRawResponse());
+        if (!StringUtils.hasText(detail)) {
+            return defaultMessage;
+        }
+        return "AI 生图失败：" + truncate(detail.replaceAll("\\s+", " ").trim(), 80);
     }
 
     private AiImportResultDto parseStructuredPayload(String payload, String fallbackText) {
@@ -457,6 +489,15 @@ public class AiImportServiceImpl implements AiImportService {
             return value;
         }
         return value.substring(0, maxLength).trim();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private int parseChineseNumber(String rawValue) {

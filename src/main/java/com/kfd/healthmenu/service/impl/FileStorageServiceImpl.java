@@ -29,6 +29,7 @@ public class FileStorageServiceImpl implements com.kfd.healthmenu.service.FileSt
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(20))
+            .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
     @Override
@@ -55,9 +56,14 @@ public class FileStorageServiceImpl implements com.kfd.healthmenu.service.FileSt
             return null;
         }
         try {
+            URI fileUri = URI.create(fileUrl);
+            String scheme = fileUri.getScheme();
+            if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+                throw new IllegalStateException("仅支持下载 http/https 图片");
+            }
             HttpRequest request = HttpRequest.newBuilder()
                     .GET()
-                    .uri(URI.create(fileUrl))
+                    .uri(fileUri)
                     .timeout(Duration.ofSeconds(60))
                     .build();
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -120,17 +126,22 @@ public class FileStorageServiceImpl implements com.kfd.healthmenu.service.FileSt
         if (!StringUtils.hasText(contentType)) {
             return ".png";
         }
-        String guessed = URLConnection.guessContentTypeFromName("x." + contentType.substring(contentType.lastIndexOf('/') + 1));
+        String normalized = contentType.toLowerCase();
+        int delimiter = normalized.indexOf(';');
+        if (delimiter >= 0) {
+            normalized = normalized.substring(0, delimiter);
+        }
+        String guessed = URLConnection.guessContentTypeFromName("x." + normalized.substring(normalized.lastIndexOf('/') + 1));
         if (guessed != null && guessed.contains("png")) {
             return ".png";
         }
-        if (contentType.contains("jpeg") || contentType.contains("jpg")) {
+        if (normalized.contains("jpeg") || normalized.contains("jpg")) {
             return ".jpg";
         }
-        if (contentType.contains("png")) {
+        if (normalized.contains("png")) {
             return ".png";
         }
-        if (contentType.contains("webp")) {
+        if (normalized.contains("webp")) {
             return ".webp";
         }
         return ".png";

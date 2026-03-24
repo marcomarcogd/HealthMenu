@@ -10,4 +10,5 @@ public class CozeWorkflowResponse {
     private String imageUrl;
     private String taskId;
     private String prompt;
+    private String errorMessage;
 }

@@ -9,7 +9,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 const payload = ref(null)
 const cardRef = ref(null)
-const logoSrc = '/logo.png'
+const logoSrc = `${import.meta.env.BASE_URL}logo.png`
 
 let html2canvasLoader = null
 
@@ -42,19 +42,13 @@ function printPage() {
 }
 
 async function ensureHtml2Canvas() {
-  if (window.html2canvas) {
-    return window.html2canvas
-  }
-
   if (!html2canvasLoader) {
-    html2canvasLoader = new Promise((resolve, reject) => {
-      const script = document.createElement('script')
-      script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js'
-      script.async = true
-      script.onload = () => resolve(window.html2canvas)
-      script.onerror = () => reject(new Error('导出依赖加载失败'))
-      document.head.appendChild(script)
-    })
+    html2canvasLoader = import('html2canvas')
+      .then((module) => module.default || module)
+      .catch(() => {
+        html2canvasLoader = null
+        throw new Error('导出组件加载失败，请稍后重试')
+      })
   }
 
   return html2canvasLoader

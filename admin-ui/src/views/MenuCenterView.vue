@@ -23,6 +23,7 @@ import {
   normalizeMenuForm,
   normalizeMenuSavePayload,
 } from '../utils/menu-form'
+import { copyText } from '../utils/clipboard'
 
 const route = useRoute()
 const router = useRouter()
@@ -40,11 +41,58 @@ const lastSavedLinks = ref({ viewUrl: '', shareUrl: '' })
 const generatingImageTarget = ref(null)
 const routeEditLoading = ref(false)
 const appBaseUrl = window.location.origin
+const menuFilters = ref({
+  keyword: '',
+  status: 'ALL',
+  sort: 'menuDateDesc',
+})
 
 const canInit = computed(() => selector.value.customerId && selector.value.templateId)
 const canSave = computed(() => menuForm.value.customerId && menuForm.value.templateId)
 const hasStepOneContent = computed(() => menuForm.value.sections.length || menuForm.value.meals.length)
 const dialogTitle = computed(() => (menuForm.value.id ? '编辑餐单' : '新建餐单'))
+const menuStatusOptions = computed(() => [
+  { label: '全部状态', value: 'ALL' },
+  ...(options.value.recordStatuses || []),
+])
+const filteredMenus = computed(() => {
+  const keyword = menuFilters.value.keyword.trim().toLowerCase()
+  const status = menuFilters.value.status
+  const sort = menuFilters.value.sort
+
+  const matched = menus.value.filter((row) => {
+    const matchesStatus = status === 'ALL' || row.status === status
+    if (!matchesStatus) {
+      return false
+    }
+
+    if (!keyword) {
+      return true
+    }
+
+    const searchable = [
+      row.title,
+      row.menuDate,
+      row.themeName,
+      row.themeCode,
+      row.statusLabel,
+      row.status,
+      `第${row.weekIndex || '-'}周`,
+    ]
+
+    return searchable.some((value) => String(value || '').toLowerCase().includes(keyword))
+  })
+
+  return [...matched].sort((left, right) => compareMenus(left, right, sort))
+})
+const menuSummary = computed(() => {
+  const total = menus.value.length
+  const visible = filteredMenus.value.length
+  const published = filteredMenus.value.filter((item) => item.status === 'PUBLISHED').length
+  const drafts = visible - published
+
+  return { total, visible, published, drafts }
+})
 
 async function refreshMenus() {
   loading.value = true
@@ -94,8 +142,12 @@ async function copyUrl(url, successText = '链接已复制') {
     ElMessage.warning('链接暂不可用')
     return
   }
-  await navigator.clipboard.writeText(resolveAppUrl(url))
-  ElMessage.success(successText)
+  try {
+    await copyText(resolveAppUrl(url))
+    ElMessage.success(successText)
+  } catch (error) {
+    ElMessage.error(error?.message || '复制失败，请手动复制链接')
+  }
 }
 
 function displayStatus(row) {
@@ -110,8 +162,37 @@ function displayPublishTime(row) {
   return row.lastPublishedAt || '-'
 }
 
+function compareMenus(left, right, sort) {
+  if (sort === 'titleAsc') {
+    return String(left.title || '').localeCompare(String(right.title || ''), 'zh-CN')
+  }
+
+  if (sort === 'publishDesc') {
+    return getSortTime(right.lastPublishedAt || right.menuDate) - getSortTime(left.lastPublishedAt || left.menuDate)
+  }
+
+  if (sort === 'menuDateAsc') {
+    return getSortTime(left.menuDate) - getSortTime(right.menuDate)
+  }
+
+  return getSortTime(right.menuDate || right.lastPublishedAt) - getSortTime(left.menuDate || left.lastPublishedAt)
+}
+
+function getSortTime(value) {
+  const time = new Date(value || 0).getTime()
+  return Number.isFinite(time) ? time : 0
+}
+
 function canPublish(row) {
   return row?.id && row?.status !== 'PUBLISHED'
+}
+
+function resetMenuFilters() {
+  menuFilters.value = {
+    keyword: '',
+    status: 'ALL',
+    sort: 'menuDateDesc',
+  }
 }
 
 function validateImageFile(file) {
@@ -466,7 +547,33 @@ watch(
       </div>
     </template>
 
-    <el-table :data="menus" v-loading="loading">
+    <div class="menu-toolbar">
+      <div class="menu-toolbar__filters">
+        <el-input
+          v-model="menuFilters.keyword"
+          clearable
+          placeholder="搜索标题、日期、主题或周次"
+          class="menu-toolbar__search"
+        />
+        <el-select v-model="menuFilters.status" class="menu-toolbar__select">
+          <el-option v-for="item in menuStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+        <el-select v-model="menuFilters.sort" class="menu-toolbar__select">
+          <el-option label="按日期倒序" value="menuDateDesc" />
+          <el-option label="按日期正序" value="menuDateAsc" />
+          <el-option label="按最近发布" value="publishDesc" />
+          <el-option label="按标题排序" value="titleAsc" />
+        </el-select>
+        <el-button plain @click="resetMenuFilters">清空筛选</el-button>
+      </div>
+      <div class="menu-toolbar__summary">
+        <span>当前显示 {{ menuSummary.visible }} / {{ menuSummary.total }}</span>
+        <span>草稿 {{ menuSummary.drafts }}</span>
+        <span>已发布 {{ menuSummary.published }}</span>
+      </div>
+    </div>
+
+    <el-table :data="filteredMenus" v-loading="loading" empty-text="没有符合条件的餐单">
       <el-table-column prop="title" label="餐单标题" min-width="180" />
       <el-table-column prop="menuDate" label="日期" width="140" />
       <el-table-column prop="weekIndex" label="周次" width="90" />
@@ -715,3 +822,54 @@ watch(
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.menu-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.menu-toolbar__filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.menu-toolbar__search {
+  width: 280px;
+  max-width: 100%;
+}
+
+.menu-toolbar__select {
+  width: 160px;
+}
+
+.menu-toolbar__summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #6b7280;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .menu-toolbar,
+  .menu-toolbar__filters,
+  .menu-toolbar__summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .menu-toolbar__search,
+  .menu-toolbar__select {
+    width: 100%;
+  }
+}
+</style>

@@ -1,27 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import AdminLayout from '../components/layout/AdminLayout.vue'
-import DashboardView from '../views/DashboardView.vue'
-import TemplateCenterView from '../views/TemplateCenterView.vue'
-import DictCenterView from '../views/DictCenterView.vue'
-import TemplateDesignerView from '../views/TemplateDesignerView.vue'
-import MenuCenterView from '../views/MenuCenterView.vue'
-import CustomerCenterView from '../views/CustomerCenterView.vue'
-import MenuPresentationView from '../views/MenuPresentationView.vue'
 
 const routes = [
-  { path: '/view/menu/:id', name: 'menu-view', component: MenuPresentationView },
-  { path: '/share/menu/:token', name: 'menu-share', component: MenuPresentationView },
+  { path: '/view/menu/:id', name: 'menu-view', component: () => import('../views/MenuPresentationView.vue') },
+  { path: '/share/menu/:token', name: 'menu-share', component: () => import('../views/MenuPresentationView.vue') },
   {
     path: '/',
-    component: AdminLayout,
+    component: () => import('../components/layout/AdminLayout.vue'),
     redirect: '/dashboard',
     children: [
-      { path: 'dashboard', name: 'dashboard', component: DashboardView },
-      { path: 'templates', name: 'templates', component: TemplateCenterView },
-      { path: 'customers', name: 'customers', component: CustomerCenterView },
-      { path: 'dicts', name: 'dicts', component: DictCenterView },
-      { path: 'template-designer/:id?', name: 'template-designer', component: TemplateDesignerView },
-      { path: 'menus', name: 'menus', component: MenuCenterView },
+      { path: 'dashboard', name: 'dashboard', component: () => import('../views/DashboardView.vue') },
+      { path: 'templates', name: 'templates', component: () => import('../views/TemplateCenterView.vue') },
+      { path: 'customers', name: 'customers', component: () => import('../views/CustomerCenterView.vue') },
+      { path: 'dicts', name: 'dicts', component: () => import('../views/DictCenterView.vue') },
+      { path: 'template-designer/:id?', name: 'template-designer', component: () => import('../views/TemplateDesignerView.vue') },
+      { path: 'menus', name: 'menus', component: () => import('../views/MenuCenterView.vue') },
     ],
   },
 ]

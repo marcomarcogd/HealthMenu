@@ -46,7 +46,7 @@ Create a database named `health_menu` before starting the backend, or override t
 Recommended variables:
 
 ```powershell
-$env:HEALTH_MENU_DB_URL="jdbc:mysql://localhost:3306/health_menu?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai"
+$env:HEALTH_MENU_DB_URL="jdbc:mysql://localhost:3306/health_menu?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai"
 $env:HEALTH_MENU_DB_USERNAME="root"
 $env:HEALTH_MENU_DB_PASSWORD=""
 $env:HEALTH_MENU_SQL_INIT_MODE="always"
@@ -58,7 +58,7 @@ Recommended database defaults:
 
 - Database charset: `utf8mb4`
 - Database collation: `utf8mb4_unicode_ci`
-- Keep the local JDBC URL on `utf8mb4` as well. If you use `src/main/resources/application-local.yaml`, make sure its `spring.datasource.url` also includes `characterEncoding=utf8mb4` and `connectionCollation=utf8mb4_unicode_ci`, otherwise Chinese content can become mojibake in the local MySQL database.
+- Keep the MySQL tables/database on `utf8mb4`, but do not set JDBC `characterEncoding=utf8mb4`. MySQL Connector/J expects a Java charset name there, so use `characterEncoding=UTF-8` (or omit `characterEncoding`) and keep `connectionCollation=utf8mb4_unicode_ci`.
 
 Optional share and upload overrides:
 

@@ -13,6 +13,7 @@ public class RoleDto {
     private List<String> permissionCodes;
     private List<String> permissionLabels;
     private Integer isSystem;
+    private Long userCount;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

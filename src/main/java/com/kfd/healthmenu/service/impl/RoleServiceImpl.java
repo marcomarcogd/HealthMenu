@@ -44,19 +44,29 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     public List<RoleDto> listRoles() {
+        Map<String, Long> roleUserCountMap = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getDeleted, 0))
+                .stream()
+                .collect(java.util.stream.Collectors.groupingBy(SysUser::getRoleCode, java.util.stream.Collectors.counting()));
+
         return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRole>()
                         .eq(SysRole::getDeleted, 0)
                         .orderByDesc(SysRole::getUpdateTime)
                         .orderByAsc(SysRole::getId))
                 .stream()
-                .map(this::toDto)
+                .map(role -> toDto(role, roleUserCountMap.getOrDefault(role.getRoleCode(), 0L)))
                 .toList();
     }
 
     @Override
     public List<PermissionOptionDto> listPermissionOptions() {
         return Arrays.stream(PermissionCode.values())
-                .map(item -> new PermissionOptionDto(item.getCode(), item.getLabel()))
+                .map(item -> new PermissionOptionDto(
+                        item.getCode(),
+                        item.getLabel(),
+                        item.getGroupLabel(),
+                        item.getDescription()
+                ))
                 .toList();
     }
 
@@ -78,7 +88,7 @@ public class RoleServiceImpl implements RoleService {
             role.setPermissionCodesJson(writePermissionCodes(permissionCodes));
             role.setIsSystem(0);
             sysRoleMapper.insert(role);
-            return toDto(sysRoleMapper.selectById(role.getId()));
+            return toDto(sysRoleMapper.selectById(role.getId()), 0L);
         }
 
         SysRole existing = requireById(request.getId());
@@ -88,7 +98,10 @@ public class RoleServiceImpl implements RoleService {
         existing.setRoleName(roleName);
         existing.setPermissionCodesJson(writePermissionCodes(permissionCodes));
         sysRoleMapper.updateById(existing);
-        return toDto(sysRoleMapper.selectById(existing.getId()));
+        Long userCount = sysUserMapper.selectCount(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getDeleted, 0)
+                .eq(SysUser::getRoleCode, existing.getRoleCode()));
+        return toDto(sysRoleMapper.selectById(existing.getId()), userCount == null ? 0L : userCount);
     }
 
     @Override
@@ -233,7 +246,7 @@ public class RoleServiceImpl implements RoleService {
         }
     }
 
-    private RoleDto toDto(SysRole role) {
+    private RoleDto toDto(SysRole role, Long userCount) {
         List<String> permissionCodes = readPermissionCodes(role.getPermissionCodesJson());
         RoleDto dto = new RoleDto();
         dto.setId(role.getId());
@@ -242,6 +255,7 @@ public class RoleServiceImpl implements RoleService {
         dto.setPermissionCodes(permissionCodes);
         dto.setPermissionLabels(resolvePermissionLabels(permissionCodes));
         dto.setIsSystem(role.getIsSystem());
+        dto.setUserCount(userCount == null ? 0L : userCount);
         dto.setCreateTime(role.getCreateTime());
         dto.setUpdateTime(role.getUpdateTime());
         return dto;

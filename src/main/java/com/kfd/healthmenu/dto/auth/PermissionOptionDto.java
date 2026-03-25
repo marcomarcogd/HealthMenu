@@ -8,4 +8,6 @@ import lombok.Data;
 public class PermissionOptionDto {
     private String code;
     private String label;
+    private String groupLabel;
+    private String description;
 }

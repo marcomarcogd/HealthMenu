@@ -31,7 +31,8 @@ class AdminRoleApiControllerTest {
         mockMvc.perform(get("/api/admin/roles"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].roleCode").exists());
+                .andExpect(jsonPath("$.data[0].roleCode").exists())
+                .andExpect(jsonPath("$.data[0].userCount").exists());
     }
 
     @Test
@@ -57,7 +58,9 @@ class AdminRoleApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].code").exists())
-                .andExpect(jsonPath("$.data[0].label").exists());
+                .andExpect(jsonPath("$.data[0].label").exists())
+                .andExpect(jsonPath("$.data[0].groupLabel").exists())
+                .andExpect(jsonPath("$.data[0].description").exists());
     }
 
     @Test

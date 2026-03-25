@@ -8,6 +8,7 @@ import com.kfd.healthmenu.dto.dict.DictTypeSaveRequest;
 import com.kfd.healthmenu.service.DictService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/dicts")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('DICT_MANAGE')")
 public class AdminDictController {
 
     private final DictService dictService;

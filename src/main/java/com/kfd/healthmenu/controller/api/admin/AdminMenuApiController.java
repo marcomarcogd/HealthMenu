@@ -16,6 +16,7 @@ import com.kfd.healthmenu.service.CustomerMenuService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 @RestController
 @RequestMapping("/api/admin/menus")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('MENU_MANAGE')")
 public class AdminMenuApiController {
 
     private final CustomerMenuService customerMenuService;

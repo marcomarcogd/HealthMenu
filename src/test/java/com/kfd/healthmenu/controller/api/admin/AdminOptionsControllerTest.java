@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-@WithMockUser(username = "admin", roles = "ADMIN")
+@WithMockUser(username = "admin", authorities = "OPTIONS_READ")
 class AdminOptionsControllerTest {
 
     @Autowired

@@ -1,0 +1,14 @@
+export const PERMISSIONS = {
+  DASHBOARD_VIEW: 'DASHBOARD_VIEW',
+  OPTIONS_READ: 'OPTIONS_READ',
+  CUSTOMER_MANAGE: 'CUSTOMER_MANAGE',
+  MENU_MANAGE: 'MENU_MANAGE',
+  TEMPLATE_MANAGE: 'TEMPLATE_MANAGE',
+  DICT_MANAGE: 'DICT_MANAGE',
+  USER_MANAGE: 'USER_MANAGE',
+}
+
+export const ROLE_PERMISSION_SUMMARIES = {
+  ADMIN: ['工作台', '客户管理', '餐单管理', '模板管理', '字典管理', '账号管理'],
+  HEALTH_MANAGER: ['工作台', '客户管理', '餐单管理'],
+}

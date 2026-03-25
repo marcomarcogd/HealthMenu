@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteUser, listUsers, resetUserPassword, saveUser } from '../api/user'
+import { ROLE_PERMISSION_SUMMARIES } from '../constants/permissions'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
@@ -14,8 +15,8 @@ const searchKeyword = ref('')
 const users = ref([])
 
 const roleOptions = [
-  { label: '管理员', value: 'ADMIN' },
-  { label: '健管师', value: 'HEALTH_MANAGER' },
+  { label: '管理员', value: 'ADMIN', summary: ROLE_PERMISSION_SUMMARIES.ADMIN },
+  { label: '健管师', value: 'HEALTH_MANAGER', summary: ROLE_PERMISSION_SUMMARIES.HEALTH_MANAGER },
 ]
 
 const form = reactive(createEmptyForm())
@@ -37,6 +38,7 @@ function createEmptyForm() {
 }
 
 const dialogTitle = computed(() => (form.id ? '编辑账号' : '新建账号'))
+const selectedRoleSummary = computed(() => ROLE_PERMISSION_SUMMARIES[form.roleCode] || [])
 const filteredUsers = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
   if (!keyword) {
@@ -199,6 +201,11 @@ onMounted(async () => {
         <el-table-column prop="username" label="账号" min-width="160" />
         <el-table-column prop="displayName" label="姓名" min-width="140" />
         <el-table-column prop="roleLabel" label="角色" width="120" />
+        <el-table-column label="权限范围" min-width="220">
+          <template #default="{ row }">
+            <span>{{ (ROLE_PERMISSION_SUMMARIES[row.roleCode] || []).join('、') || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
@@ -240,6 +247,7 @@ onMounted(async () => {
         <el-radio-group v-model="form.roleCode">
           <el-radio v-for="item in roleOptions" :key="item.value" :value="item.value">{{ item.label }}</el-radio>
         </el-radio-group>
+        <div class="role-summary">当前角色可访问：{{ selectedRoleSummary.join('、') }}</div>
       </el-form-item>
       <el-form-item label="状态">
         <el-radio-group v-model="form.status">
@@ -282,5 +290,11 @@ onMounted(async () => {
 <style scoped>
 .user-search {
   width: 260px;
+}
+
+.role-summary {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6a7890;
 }
 </style>

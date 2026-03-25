@@ -11,6 +11,7 @@ import com.kfd.healthmenu.dto.api.LabelValueOption;
 import com.kfd.healthmenu.service.CustomerService;
 import com.kfd.healthmenu.service.TemplateService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/options")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('OPTIONS_READ')")
 public class AdminOptionsController {
 
     private final CustomerService customerService;

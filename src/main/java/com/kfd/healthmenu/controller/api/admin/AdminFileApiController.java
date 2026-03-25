@@ -5,6 +5,7 @@ import com.kfd.healthmenu.dto.api.ApiResponse;
 import com.kfd.healthmenu.dto.api.FileUploadResponse;
 import com.kfd.healthmenu.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/admin/files")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('MENU_MANAGE')")
 public class AdminFileApiController {
 
     private final FileStorageService fileStorageService;

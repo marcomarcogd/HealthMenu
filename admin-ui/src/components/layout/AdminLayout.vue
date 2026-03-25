@@ -3,6 +3,7 @@ import { Calendar, DocumentCopy, Grid, Setting, SwitchButton, User, UserFilled }
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
+import { PERMISSIONS } from '../../constants/permissions'
 import { useAuthStore } from '../../stores/auth'
 
 const route = useRoute()
@@ -10,15 +11,16 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const menus = [
-  { index: '/dashboard', label: '工作台', icon: Grid },
-  { index: '/templates', label: '模板中心', icon: DocumentCopy },
-  { index: '/customers', label: '客户管理', icon: User },
-  { index: '/dicts', label: '字典中心', icon: Setting },
-  { index: '/menus', label: '餐单管理', icon: Calendar },
-  { index: '/users', label: '账号管理', icon: UserFilled },
+  { index: '/dashboard', label: '工作台', icon: Grid, permission: PERMISSIONS.DASHBOARD_VIEW },
+  { index: '/templates', label: '模板中心', icon: DocumentCopy, permission: PERMISSIONS.TEMPLATE_MANAGE },
+  { index: '/customers', label: '客户管理', icon: User, permission: PERMISSIONS.CUSTOMER_MANAGE },
+  { index: '/dicts', label: '字典中心', icon: Setting, permission: PERMISSIONS.DICT_MANAGE },
+  { index: '/menus', label: '餐单管理', icon: Calendar, permission: PERMISSIONS.MENU_MANAGE },
+  { index: '/users', label: '账号管理', icon: UserFilled, permission: PERMISSIONS.USER_MANAGE },
 ]
 
 const currentUser = computed(() => authStore.currentUser)
+const visibleMenus = computed(() => menus.filter((item) => !item.permission || authStore.hasPermission(item.permission)))
 
 const activeMenu = () => {
   if (route.path.startsWith('/template-designer')) {
@@ -46,7 +48,7 @@ async function handleLogout() {
         <div class="brand-subtitle">健管师后台</div>
       </div>
       <el-menu :default-active="activeMenu()" class="side-menu" @select="go">
-        <el-menu-item v-for="item in menus" :key="item.index" :index="item.index">
+        <el-menu-item v-for="item in visibleMenus" :key="item.index" :index="item.index">
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.label }}</span>
         </el-menu-item>

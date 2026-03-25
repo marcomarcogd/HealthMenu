@@ -8,6 +8,7 @@ import com.kfd.healthmenu.dto.auth.UserSaveRequest;
 import com.kfd.healthmenu.dto.auth.UserSummaryDto;
 import com.kfd.healthmenu.entity.SysUser;
 import com.kfd.healthmenu.mapper.SysUserMapper;
+import com.kfd.healthmenu.security.RolePermissionResolver;
 import com.kfd.healthmenu.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -193,6 +194,7 @@ public class AccountServiceImpl implements AccountService {
         dto.setRoleLabel(resolveRoleLabel(user.getRoleCode()));
         dto.setStatus(user.getStatus());
         dto.setLastLoginAt(user.getLastLoginAt());
+        dto.setPermissions(RolePermissionResolver.resolveCodes(user.getRoleCode()));
         return dto;
     }
 

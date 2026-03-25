@@ -11,6 +11,7 @@ import com.kfd.healthmenu.entity.MenuTemplate;
 import com.kfd.healthmenu.service.TemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/templates")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('TEMPLATE_MANAGE')")
 public class AdminTemplateApiController {
 
     private final TemplateService templateService;

@@ -9,6 +9,7 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (state) => !!state.currentUser,
+    permissionSet: (state) => new Set(state.currentUser?.permissions || []),
   },
   actions: {
     async ensureLoaded() {
@@ -56,6 +57,9 @@ export const useAuthStore = defineStore('auth', {
         this.currentUser = null
         this.initialized = true
       }
+    },
+    hasPermission(permission) {
+      return this.permissionSet.has(permission)
     },
   },
 })

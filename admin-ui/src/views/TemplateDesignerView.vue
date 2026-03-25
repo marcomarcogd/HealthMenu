@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
           </div>
         </template>
         <el-alert
-          title="图片能力尚未接通到餐单编辑、发布页展示和 AI 生图流程，当前“允许图片”仅作为结构占位信息保存。"
+          title="“允许图片”已接通餐单编辑、成品展示和 AI 生图。开启后，该区块或字段会在餐单编辑页显示上传图片和 AI 生图入口。"
           type="info"
           :closable="false"
           show-icon
@@ -580,7 +580,10 @@ onBeforeUnmount(() => {
             </div>
           </el-form-item>
           <el-form-item label="是否启用"><el-switch v-model="selectedSection.enabled" @change="markDirty" /></el-form-item>
-          <el-form-item label="允许图片"><el-switch v-model="selectedSection.allowImage" @change="markDirty" /></el-form-item>
+          <el-form-item label="允许图片">
+            <el-switch v-model="selectedSection.allowImage" @change="markDirty" />
+            <div class="form-help-text">开启后，餐单编辑页可为该区块上传图片或手动触发 AI 生图。</div>
+          </el-form-item>
         </el-form>
 
         <el-form v-else-if="selectedPanel === 'meal' && selectedMeal" label-position="top">
@@ -599,7 +602,10 @@ onBeforeUnmount(() => {
             </el-select>
           </el-form-item>
           <el-form-item label="是否启用"><el-switch v-model="selectedItem.enabled" @change="markDirty" /></el-form-item>
-          <el-form-item label="允许图片"><el-switch v-model="selectedItem.allowImage" @change="markDirty" /></el-form-item>
+          <el-form-item label="允许图片">
+            <el-switch v-model="selectedItem.allowImage" @change="markDirty" />
+            <div class="form-help-text">开启后，该字段支持上传图片，并可按当前内容或提示词手动 AI 生图。</div>
+          </el-form-item>
         </el-form>
 
         <el-empty v-else description="请选择左侧元素进行配置" />
@@ -742,5 +748,12 @@ onBeforeUnmount(() => {
 
 .wide-btn {
   width: 100%;
+}
+
+.form-help-text {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
 }
 </style>

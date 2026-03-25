@@ -16,15 +16,19 @@ function createEmptyDashboard() {
     customers: [],
     templates: [],
     dictTypes: [],
-    menus: [],
+    recentMenus: [],
+    menuTotal: 0,
+    publishedMenuTotal: 0,
+    draftMenuTotal: 0,
   }
 }
 
 const stats = computed(() => {
   const templates = dashboard.value.templates || []
-  const menus = dashboard.value.menus || []
   const customers = dashboard.value.customers || []
   const dictTypes = dashboard.value.dictTypes || []
+  const menuTotal = Number(dashboard.value.menuTotal || 0)
+  const publishedMenuTotal = Number(dashboard.value.publishedMenuTotal || 0)
 
   return [
     {
@@ -39,8 +43,8 @@ const stats = computed(() => {
     },
     {
       label: '餐单总数',
-      value: menus.length,
-      hint: `已发布 ${menus.filter((item) => item.status === 'PUBLISHED').length} 份`,
+      value: menuTotal,
+      hint: `已发布 ${publishedMenuTotal} 份`,
     },
     {
       label: '字典类型',
@@ -52,17 +56,16 @@ const stats = computed(() => {
 
 const todoItems = computed(() => {
   const templates = dashboard.value.templates || []
-  const menus = dashboard.value.menus || []
   const customers = dashboard.value.customers || []
-  const draftMenus = menus.filter((item) => item.status !== 'PUBLISHED')
   const disabledTemplates = templates.filter((item) => item.status !== 1)
   const missingCustomerTitle = customers.filter((item) => !item.exclusiveTitle)
+  const draftMenuTotal = Number(dashboard.value.draftMenuTotal || 0)
 
   return [
     {
       title: '待发布餐单',
-      count: draftMenus.length,
-      description: draftMenus.length ? '还有草稿未正式发布，可继续编辑或直接发布。' : '当前没有待发布餐单。',
+      count: draftMenuTotal,
+      description: draftMenuTotal ? '还有草稿未正式发布，可继续编辑或直接发布。' : '当前没有待发布餐单。',
       actionLabel: '去餐单中心',
       action: () => router.push('/menus'),
     },
@@ -84,7 +87,7 @@ const todoItems = computed(() => {
 })
 
 const recentMenus = computed(() => {
-  return [...(dashboard.value.menus || [])]
+  return [...(dashboard.value.recentMenus || [])]
     .sort((left, right) => {
       const rightTime = new Date(right.lastPublishedAt || right.menuDate || 0).getTime()
       const leftTime = new Date(left.lastPublishedAt || left.menuDate || 0).getTime()
@@ -120,18 +123,35 @@ async function loadDashboard() {
   loading.value = true
 
   try {
-    const [options, templates, dictTypes, menus] = await Promise.all([
+    const [options, templates, dictTypes, recentMenus, publishedMenus, draftMenus] = await Promise.all([
       getAdminOptions(),
       listTemplates(),
       listDictTypes(),
-      listMenus(),
+      listMenus({
+        page: 1,
+        pageSize: 6,
+        sort: 'updatedDesc',
+      }),
+      listMenus({
+        page: 1,
+        pageSize: 1,
+        status: 'PUBLISHED',
+      }),
+      listMenus({
+        page: 1,
+        pageSize: 1,
+        status: 'DRAFT',
+      }),
     ])
 
     dashboard.value = {
       customers: options?.customers || [],
       templates: templates || [],
       dictTypes: dictTypes || [],
-      menus: menus || [],
+      recentMenus: recentMenus?.records || [],
+      menuTotal: Number(recentMenus?.total || 0),
+      publishedMenuTotal: Number(publishedMenus?.total || 0),
+      draftMenuTotal: Number(draftMenus?.total || 0),
     }
   } catch (error) {
     dashboard.value = createEmptyDashboard()

@@ -1,5 +1,5 @@
 <script setup>
-import { Calendar, DocumentCopy, Grid, Setting, SwitchButton, User, UserFilled } from '@element-plus/icons-vue'
+import { Calendar, DocumentCopy, Grid, Lock, Setting, SwitchButton, User, UserFilled } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
@@ -17,6 +17,7 @@ const menus = [
   { index: '/dicts', label: '字典中心', icon: Setting, permission: PERMISSIONS.DICT_MANAGE },
   { index: '/menus', label: '餐单管理', icon: Calendar, permission: PERMISSIONS.MENU_MANAGE },
   { index: '/users', label: '账号管理', icon: UserFilled, permission: PERMISSIONS.USER_MANAGE },
+  { index: '/roles', label: '角色权限', icon: Lock, permission: PERMISSIONS.ROLE_MANAGE },
 ]
 
 const currentUser = computed(() => authStore.currentUser)

@@ -1,9 +1,11 @@
 package com.kfd.healthmenu.config;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kfd.healthmenu.common.PermissionCode;
 import com.kfd.healthmenu.common.UserRole;
 import com.kfd.healthmenu.entity.SysUser;
 import com.kfd.healthmenu.mapper.SysUserMapper;
+import com.kfd.healthmenu.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,6 +22,7 @@ public class AccountBootstrapConfig {
 
     private final SysUserMapper sysUserMapper;
     private final PasswordEncoder passwordEncoder;
+    private final RoleService roleService;
 
     @Value("${app.auth.bootstrap-admin-username:admin}")
     private String bootstrapAdminUsername;
@@ -42,9 +45,28 @@ public class AccountBootstrapConfig {
     @Bean
     public ApplicationRunner accountBootstrapRunner() {
         return args -> {
+            ensureSystemRoles();
             createUserIfMissing(bootstrapAdminUsername, bootstrapAdminPassword, bootstrapAdminDisplayName, UserRole.ADMIN);
             createUserIfMissing(bootstrapManagerUsername, bootstrapManagerPassword, bootstrapManagerDisplayName, UserRole.HEALTH_MANAGER);
         };
+    }
+
+    private void ensureSystemRoles() {
+        roleService.ensureSystemRole(
+                UserRole.ADMIN.getCode(),
+                UserRole.ADMIN.getLabel(),
+                java.util.Arrays.stream(PermissionCode.values()).map(PermissionCode::getCode).toList()
+        );
+        roleService.ensureSystemRole(
+                UserRole.HEALTH_MANAGER.getCode(),
+                UserRole.HEALTH_MANAGER.getLabel(),
+                java.util.List.of(
+                        PermissionCode.DASHBOARD_VIEW.getCode(),
+                        PermissionCode.OPTIONS_READ.getCode(),
+                        PermissionCode.CUSTOMER_MANAGE.getCode(),
+                        PermissionCode.MENU_MANAGE.getCode()
+                )
+        );
     }
 
     private void createUserIfMissing(String username, String password, String displayName, UserRole role) {

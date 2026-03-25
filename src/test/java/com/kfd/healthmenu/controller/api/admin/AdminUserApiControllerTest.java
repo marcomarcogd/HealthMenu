@@ -92,7 +92,9 @@ class AdminUserApiControllerTest {
                                 current.getPassword(),
                                 current.getDisplayName(),
                                 current.getRoleCode(),
-                                current.getStatus()
+                                "管理员",
+                                current.getStatus(),
+                                java.util.List.of("USER_MANAGE", "ROLE_MANAGE")
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(false))

@@ -3,6 +3,7 @@ package com.kfd.healthmenu.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kfd.healthmenu.dto.api.ApiResponse;
 import com.kfd.healthmenu.security.AccountUserDetailsService;
+import com.kfd.healthmenu.security.AuthenticatedUserRefreshFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -44,13 +46,15 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   AccountUserDetailsService accountUserDetailsService) throws Exception {
+                                                   AccountUserDetailsService accountUserDetailsService,
+                                                   AuthenticatedUserRefreshFilter authenticatedUserRefreshFilter) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .userDetailsService(accountUserDetailsService)
+                .addFilterAfter(authenticatedUserRefreshFilter, SecurityContextHolderFilter.class)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/public/**", "/uploads/**", "/view/**", "/share/**", "/error").permitAll()

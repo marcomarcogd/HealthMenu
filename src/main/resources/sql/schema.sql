@@ -12,6 +12,18 @@ CREATE TABLE IF NOT EXISTS customer (
     deleted TINYINT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS sys_role (
+    id BIGINT PRIMARY KEY,
+    role_code VARCHAR(64) NOT NULL,
+    role_name VARCHAR(64) NOT NULL,
+    permission_codes_json TEXT NOT NULL,
+    is_system TINYINT NOT NULL DEFAULT 0,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    UNIQUE KEY uk_sys_role_code (role_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS menu_template (
     id BIGINT PRIMARY KEY,
     name VARCHAR(128) NOT NULL,

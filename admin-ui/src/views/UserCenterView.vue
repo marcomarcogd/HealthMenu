@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { listRoles } from '../api/role'
 import { deleteUser, listUsers, resetUserPassword, saveUser } from '../api/user'
 import { listUserAuditLogs } from '../api/user-audit'
-import { ROLE_PERMISSION_SUMMARIES } from '../constants/permissions'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
@@ -16,13 +16,9 @@ const auditDrawerVisible = ref(false)
 const auditLoading = ref(false)
 const searchKeyword = ref('')
 const users = ref([])
+const roles = ref([])
 const auditLogs = ref([])
 const auditTitle = ref('账号操作审计')
-
-const roleOptions = [
-  { label: '管理员', value: 'ADMIN', summary: ROLE_PERMISSION_SUMMARIES.ADMIN },
-  { label: '健管师', value: 'HEALTH_MANAGER', summary: ROLE_PERMISSION_SUMMARIES.HEALTH_MANAGER },
-]
 
 const form = reactive(createEmptyForm())
 const resetForm = reactive({
@@ -43,7 +39,14 @@ function createEmptyForm() {
 }
 
 const dialogTitle = computed(() => (form.id ? '编辑账号' : '新建账号'))
-const selectedRoleSummary = computed(() => ROLE_PERMISSION_SUMMARIES[form.roleCode] || [])
+const roleSummaryMap = computed(() => {
+  const map = new Map()
+  for (const role of roles.value) {
+    map.set(role.roleCode, role.permissionLabels || [])
+  }
+  return map
+})
+const selectedRoleSummary = computed(() => roleSummaryMap.value.get(form.roleCode) || [])
 const filteredUsers = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
   if (!keyword) {
@@ -74,6 +77,9 @@ function formatDateTime(value) {
 
 function openCreateDialog() {
   resetSaveForm()
+  if (roles.value.length > 0) {
+    form.roleCode = roles.value[0].roleCode
+  }
   dialogVisible.value = true
 }
 
@@ -124,6 +130,18 @@ async function loadUsers() {
   }
 }
 
+async function loadRoles() {
+  try {
+    roles.value = await listRoles()
+    if (!form.roleCode && roles.value.length > 0) {
+      form.roleCode = roles.value[0].roleCode
+    }
+  } catch (error) {
+    roles.value = []
+    ElMessage.error(error?.message || '角色列表加载失败')
+  }
+}
+
 async function submitSave() {
   if (!form.username.trim()) {
     ElMessage.warning('请输入账号')
@@ -131,6 +149,10 @@ async function submitSave() {
   }
   if (!form.displayName.trim()) {
     ElMessage.warning('请输入姓名')
+    return
+  }
+  if (!form.roleCode) {
+    ElMessage.warning('请选择角色')
     return
   }
   if (!form.id && !form.password.trim()) {
@@ -199,7 +221,7 @@ async function removeUser(row) {
 }
 
 onMounted(async () => {
-  await loadUsers()
+  await Promise.all([loadUsers(), loadRoles()])
 })
 </script>
 
@@ -223,7 +245,7 @@ onMounted(async () => {
         <el-table-column prop="roleLabel" label="角色" width="120" />
         <el-table-column label="权限范围" min-width="220">
           <template #default="{ row }">
-            <span>{{ (ROLE_PERMISSION_SUMMARIES[row.roleCode] || []).join('、') || '-' }}</span>
+            <span>{{ (roleSummaryMap.get(row.roleCode) || []).join('、') || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
@@ -265,9 +287,9 @@ onMounted(async () => {
         <el-input v-model="form.displayName" placeholder="请输入姓名" />
       </el-form-item>
       <el-form-item label="角色">
-        <el-radio-group v-model="form.roleCode">
-          <el-radio v-for="item in roleOptions" :key="item.value" :value="item.value">{{ item.label }}</el-radio>
-        </el-radio-group>
+        <el-select v-model="form.roleCode" placeholder="请选择角色">
+          <el-option v-for="item in roles" :key="item.roleCode" :label="item.roleName" :value="item.roleCode" />
+        </el-select>
         <div class="role-summary">当前角色可访问：{{ selectedRoleSummary.join('、') }}</div>
       </el-form-item>
       <el-form-item label="状态">

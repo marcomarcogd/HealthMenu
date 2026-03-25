@@ -7,7 +7,8 @@ public enum PermissionCode {
     MENU_MANAGE("餐单管理"),
     TEMPLATE_MANAGE("模板管理"),
     DICT_MANAGE("字典管理"),
-    USER_MANAGE("账号管理");
+    USER_MANAGE("账号管理"),
+    ROLE_MANAGE("角色权限管理");
 
     private final String label;
 

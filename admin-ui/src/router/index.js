@@ -21,6 +21,7 @@ const routes = [
       { path: 'template-designer/:id?', name: 'template-designer', component: () => import('../views/TemplateDesignerView.vue'), meta: { permission: PERMISSIONS.TEMPLATE_MANAGE } },
       { path: 'menus', name: 'menus', component: () => import('../views/MenuCenterView.vue'), meta: { permission: PERMISSIONS.MENU_MANAGE } },
       { path: 'users', name: 'users', component: () => import('../views/UserCenterView.vue'), meta: { permission: PERMISSIONS.USER_MANAGE } },
+      { path: 'roles', name: 'roles', component: () => import('../views/RoleCenterView.vue'), meta: { permission: PERMISSIONS.ROLE_MANAGE } },
     ],
   },
 ]

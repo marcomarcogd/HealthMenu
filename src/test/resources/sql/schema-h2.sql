@@ -12,6 +12,18 @@ CREATE TABLE IF NOT EXISTS customer (
     deleted TINYINT NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS sys_role (
+    id BIGINT PRIMARY KEY,
+    role_code VARCHAR(64) NOT NULL,
+    role_name VARCHAR(64) NOT NULL,
+    permission_codes_json CLOB NOT NULL,
+    is_system TINYINT NOT NULL DEFAULT 0,
+    create_time TIMESTAMP NOT NULL,
+    update_time TIMESTAMP NOT NULL,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    CONSTRAINT uk_sys_role_code UNIQUE (role_code)
+);
+
 CREATE TABLE IF NOT EXISTS menu_template (
     id BIGINT PRIMARY KEY,
     name VARCHAR(128) NOT NULL,

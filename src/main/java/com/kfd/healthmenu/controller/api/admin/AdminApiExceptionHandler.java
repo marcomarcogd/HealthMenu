@@ -33,6 +33,8 @@ public class AdminApiExceptionHandler {
             Map.entry("username", "账号"),
             Map.entry("displayName", "姓名"),
             Map.entry("roleCode", "角色"),
+            Map.entry("roleName", "角色名称"),
+            Map.entry("permissionCodes", "权限"),
             Map.entry("status", "状态"),
             Map.entry("password", "密码")
     );

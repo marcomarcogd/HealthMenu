@@ -12,8 +12,8 @@ import com.kfd.healthmenu.entity.SysUser;
 import com.kfd.healthmenu.entity.SysUserAuditLog;
 import com.kfd.healthmenu.mapper.SysUserAuditLogMapper;
 import com.kfd.healthmenu.mapper.SysUserMapper;
-import com.kfd.healthmenu.security.RolePermissionResolver;
 import com.kfd.healthmenu.service.AccountService;
+import com.kfd.healthmenu.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,6 +29,7 @@ public class AccountServiceImpl implements AccountService {
 
     private final SysUserMapper sysUserMapper;
     private final SysUserAuditLogMapper sysUserAuditLogMapper;
+    private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -186,11 +187,11 @@ public class AccountServiceImpl implements AccountService {
     }
 
     private String normalizeRoleCode(String roleCode) {
-        try {
-            return UserRole.fromCode(roleCode == null ? "" : roleCode.trim()).getCode();
-        } catch (IllegalArgumentException ex) {
+        String normalized = roleCode == null ? "" : roleCode.trim();
+        if (!StringUtils.hasText(normalized)) {
             throw new BizException("INVALID_ROLE", "账号角色不正确");
         }
+        return roleService.requireByRoleCode(normalized).getRoleCode();
     }
 
     private String requireValidPassword(String password, boolean createMode) {
@@ -230,7 +231,7 @@ public class AccountServiceImpl implements AccountService {
         dto.setRoleLabel(resolveRoleLabel(user.getRoleCode()));
         dto.setStatus(user.getStatus());
         dto.setLastLoginAt(user.getLastLoginAt());
-        dto.setPermissions(RolePermissionResolver.resolveCodes(user.getRoleCode()));
+        dto.setPermissions(roleService.resolvePermissionCodes(user.getRoleCode()));
         return dto;
     }
 
@@ -249,11 +250,7 @@ public class AccountServiceImpl implements AccountService {
     }
 
     private String resolveRoleLabel(String roleCode) {
-        try {
-            return UserRole.fromCode(roleCode).getLabel();
-        } catch (IllegalArgumentException ex) {
-            return roleCode;
-        }
+        return roleService.resolveRoleName(roleCode);
     }
 
     private String buildCreateDetail(SysUser user) {

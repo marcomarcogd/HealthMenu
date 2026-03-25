@@ -1,93 +1,83 @@
 <script setup>
-import { ref } from 'vue'
-import viteLogo from '../assets/vite.svg'
-import heroImg from '../assets/hero.png'
-import vueLogo from '../assets/vue.svg'
-
-const count = ref(0)
+const quickLinks = [
+  { label: '查看项目文档', href: 'https://github.com/marcomarcogd/HealthMenu' },
+  { label: '了解 Vue 3', href: 'https://cn.vuejs.org/' },
+  { label: '了解 Vite', href: 'https://cn.vite.dev/' },
+]
 </script>
 
 <template>
-  <section id="center">
-    <div class="hero">
-      <img :src="heroImg" class="base" width="170" height="179" alt="" />
-      <img :src="vueLogo" class="framework" alt="Vue logo" />
-      <img :src="viteLogo" class="vite" alt="Vite logo" />
-    </div>
-    <div>
-      <h1>Get started</h1>
-      <p>Edit <code>src/App.vue</code> and save to test <code>HMR</code></p>
-    </div>
-    <button class="counter" @click="count++">Count is {{ count }}</button>
-  </section>
+  <section class="intro-card">
+    <h1>后台管理端开发说明</h1>
+    <p class="intro-text">如果你正在本地调试这个前端，可以优先关注接口代理、权限菜单和页面构建是否正常。</p>
 
-  <div class="ticks"></div>
-
-  <section id="next-steps">
-    <div id="docs">
-      <svg class="icon" role="presentation" aria-hidden="true">
-        <use href="/icons.svg#documentation-icon"></use>
-      </svg>
-      <h2>Documentation</h2>
-      <p>Your questions, answered</p>
-      <ul>
-        <li>
-          <a href="https://vite.dev/" target="_blank">
-            <img class="logo" :src="viteLogo" alt="" />
-            Explore Vite
-          </a>
-        </li>
-        <li>
-          <a href="https://vuejs.org/" target="_blank">
-            <img class="button-icon" :src="vueLogo" alt="" />
-            Learn more
-          </a>
-        </li>
-      </ul>
-    </div>
-    <div id="social">
-      <svg class="icon" role="presentation" aria-hidden="true">
-        <use href="/icons.svg#social-icon"></use>
-      </svg>
-      <h2>Connect with us</h2>
-      <p>Join the Vite community</p>
-      <ul>
-        <li>
-          <a href="https://github.com/vitejs/vite" target="_blank">
-            <svg class="button-icon" role="presentation" aria-hidden="true">
-              <use href="/icons.svg#github-icon"></use>
-            </svg>
-            GitHub
-          </a>
-        </li>
-        <li>
-          <a href="https://chat.vite.dev/" target="_blank">
-            <svg class="button-icon" role="presentation" aria-hidden="true">
-              <use href="/icons.svg#discord-icon"></use>
-            </svg>
-            Discord
-          </a>
-        </li>
-        <li>
-          <a href="https://x.com/vite_js" target="_blank">
-            <svg class="button-icon" role="presentation" aria-hidden="true">
-              <use href="/icons.svg#x-icon"></use>
-            </svg>
-            X.com
-          </a>
-        </li>
-        <li>
-          <a href="https://bsky.app/profile/vite.dev" target="_blank">
-            <svg class="button-icon" role="presentation" aria-hidden="true">
-              <use href="/icons.svg#bluesky-icon"></use>
-            </svg>
-            Bluesky
-          </a>
-        </li>
-      </ul>
+    <div class="tips">
+      <div class="tip-item">
+        <h2>建议检查</h2>
+        <p>确认后端服务已启动，`/api/admin` 代理可访问。</p>
+      </div>
+      <div class="tip-item">
+        <h2>常用命令</h2>
+        <p>`npm run dev`、`npm run build`、`npm test`</p>
+      </div>
+      <div class="tip-item">
+        <h2>相关资料</h2>
+        <ul>
+          <li v-for="item in quickLinks" :key="item.href">
+            <a :href="item.href" target="_blank" rel="noreferrer">{{ item.label }}</a>
+          </li>
+        </ul>
+      </div>
     </div>
   </section>
-
-  <div class="ticks"></div>
-  <section id="spacer"></section>
 </template>
+
+<style scoped>
+.intro-card {
+  padding: 24px;
+  border: 1px solid #d8e0eb;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  color: #23324d;
+}
+
+.intro-text {
+  margin-top: 12px;
+  color: #5f6f8c;
+  line-height: 1.7;
+}
+
+.tips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.tip-item {
+  padding: 16px;
+  border-radius: 12px;
+  background: #f3f7fc;
+}
+
+.tip-item h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.tip-item p,
+.tip-item ul {
+  margin: 0;
+  color: #5f6f8c;
+  line-height: 1.7;
+}
+
+.tip-item ul {
+  padding-left: 18px;
+}
+
+.tip-item a {
+  color: #2d6cdf;
+  text-decoration: none;
+}
+</style>

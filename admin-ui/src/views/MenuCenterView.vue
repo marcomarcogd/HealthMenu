@@ -201,11 +201,37 @@ function displayTheme(row) {
 }
 
 function displayPublishTime(row) {
-  return row.lastPublishedAt || '-'
+  return formatDateTime(row.lastPublishedAt) || '未发布'
 }
 
 function canPublish(row) {
   return row?.id && row?.status !== 'PUBLISHED'
+}
+
+function hasShareLink(row) {
+  return row?.status === 'PUBLISHED' && !!row?.shareUrl
+}
+
+function viewButtonText(row) {
+  return row?.status === 'PUBLISHED' ? '查看成品' : '预览成品'
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
 function resetMenuFilters() {
@@ -982,8 +1008,8 @@ watch(
           <el-button link type="primary" @click="editMenu(row)">编辑</el-button>
           <el-button v-if="canPublish(row)" link type="warning" @click="publishCurrentMenu(row)">发布</el-button>
           <el-button link @click="exportExcel(row)">导出 Excel</el-button>
-          <el-button link type="success" @click="openUrl(row.viewUrl)">查看成品</el-button>
-          <el-button link @click="copyUrl(row.shareUrl, '分享链接已复制')">复制链接</el-button>
+          <el-button link type="success" @click="openUrl(row.viewUrl)">{{ viewButtonText(row) }}</el-button>
+          <el-button v-if="hasShareLink(row)" link @click="copyUrl(row.shareUrl, '分享链接已复制')">复制链接</el-button>
           <el-button link type="danger" @click="removeMenu(row)">删除</el-button>
         </template>
       </el-table-column>

@@ -411,7 +411,7 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         if (form.getId() != null) {
             form.setViewUrl(buildViewUrl(form.getId()));
             CustomerMenu menu = getById(form.getId());
-            if (menu != null && StringUtils.hasText(menu.getShareToken())) {
+            if (menu != null && RecordStatus.PUBLISHED.name().equals(form.getStatus()) && StringUtils.hasText(menu.getShareToken())) {
                 form.setShareUrl(buildShareUrl(menu.getShareToken()));
             }
             form.setPublishCount((int) countPublishRecords(form.getId()));
@@ -725,7 +725,9 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         MenuTemplate template = templateService.getById(menu.getTemplateId());
         dto.setThemeName(resolveThemeName(menu.getThemeCode(), template));
         dto.setViewUrl(buildViewUrl(menu.getId()));
-        dto.setShareUrl(buildShareUrl(menu.getShareToken()));
+        if (RecordStatus.PUBLISHED.name().equals(menu.getStatus())) {
+            dto.setShareUrl(buildShareUrl(menu.getShareToken()));
+        }
         dto.setPublishCount((int) countPublishRecords(menu.getId()));
         dto.setLastPublishedAt(findLastPublishedAt(menu.getId()));
         return dto;

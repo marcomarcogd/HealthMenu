@@ -1,5 +1,6 @@
 package com.kfd.healthmenu.controller.api;
 
+import com.kfd.healthmenu.common.RecordStatus;
 import com.kfd.healthmenu.dto.CustomerMenuForm;
 import com.kfd.healthmenu.entity.CustomerMenu;
 import com.kfd.healthmenu.mapper.CustomerMenuMapper;
@@ -60,6 +61,7 @@ class MenuPresentationApiControllerTest {
     void share_shouldReturnShareModePayload() throws Exception {
         CustomerMenu menu = new CustomerMenu();
         menu.setId(7001L);
+        menu.setStatus(RecordStatus.PUBLISHED.name());
 
         CustomerMenuForm form = new CustomerMenuForm();
         form.setId(7001L);
@@ -73,5 +75,16 @@ class MenuPresentationApiControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.shareMode").value(true))
                 .andExpect(jsonPath("$.data.menuForm.title").value("分享餐单"));
+    }
+
+    @Test
+    void share_shouldRejectDraftMenu() throws Exception {
+        when(customerMenuMapper.selectOne(org.mockito.ArgumentMatchers.any())).thenReturn(null);
+
+        mockMvc.perform(get("/api/public/menus/share/share-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("MENU_NOT_PUBLISHED"))
+                .andExpect(jsonPath("$.message").value("餐单尚未发布，暂不能通过分享链接查看"));
     }
 }

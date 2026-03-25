@@ -5,6 +5,9 @@ import com.kfd.healthmenu.dto.CustomerMenuForm;
 import com.kfd.healthmenu.dto.CustomerMenuMealForm;
 import com.kfd.healthmenu.dto.CustomerMenuMealItemForm;
 import com.kfd.healthmenu.dto.CustomerMenuSectionForm;
+import com.kfd.healthmenu.dto.api.PageResult;
+import com.kfd.healthmenu.dto.menu.CustomerMenuSummaryDto;
+import com.kfd.healthmenu.dto.menu.MenuSummaryQuery;
 import com.kfd.healthmenu.entity.Customer;
 import com.kfd.healthmenu.entity.CustomerMenu;
 import com.kfd.healthmenu.entity.MenuPublishRecord;
@@ -250,6 +253,23 @@ class CustomerMenuServiceImplTest {
             assertThat(meal.getTimeLabel()).isNotBlank();
             assertThat(meal.getMealTime()).isEqualTo(meal.getTimeLabel());
         });
+    }
+
+    @Test
+    void listSummaries_shouldHideShareUrlForDraftMenus() {
+        Long menuId = saveSimpleMenu("草稿分享控制测试", LocalDate.of(2026, 3, 29));
+
+        PageResult<CustomerMenuSummaryDto> result = customerMenuService.listSummaries(new MenuSummaryQuery());
+
+        assertThat(result.getRecords().stream()
+                .filter(item -> menuId.equals(item.getId()))
+                .findFirst())
+                .isPresent()
+                .get()
+                .satisfies(summary -> {
+                    assertThat(summary.getStatus()).isEqualTo("DRAFT");
+                    assertThat(summary.getShareUrl()).isNull();
+                });
     }
 
     @Test

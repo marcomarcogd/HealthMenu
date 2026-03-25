@@ -1,6 +1,7 @@
 package com.kfd.healthmenu.controller.api.portal;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kfd.healthmenu.common.RecordStatus;
 import com.kfd.healthmenu.common.BizException;
 import com.kfd.healthmenu.dto.CustomerMenuForm;
 import com.kfd.healthmenu.dto.api.ApiResponse;
@@ -35,8 +36,12 @@ public class MenuPresentationApiController {
     public ApiResponse<MenuPresentationDto> share(@PathVariable String token) {
         CustomerMenu menu = customerMenuMapper.selectOne(new LambdaQueryWrapper<CustomerMenu>()
                 .eq(CustomerMenu::getShareToken, token)
+                .eq(CustomerMenu::getStatus, RecordStatus.PUBLISHED.name())
                 .eq(CustomerMenu::getDeleted, 0)
                 .last("limit 1"));
+        if (menu == null) {
+            throw new BizException("MENU_NOT_PUBLISHED", "餐单尚未发布，暂不能通过分享链接查看");
+        }
         return ApiResponse.success(buildPayload(menu, true));
     }
 

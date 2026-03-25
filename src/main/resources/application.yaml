@@ -54,4 +54,4 @@ app:
     text-import-token: ${APP_COZE_TEXT_IMPORT_TOKEN:}
     image-url: ${APP_COZE_IMAGE_URL:}
     image-token: ${APP_COZE_IMAGE_TOKEN:}
-    image-style-hint: ${APP_COZE_IMAGE_STYLE_HINT:营养师海报风，干净、柔和、真实食材质感}
+    image-style-hint: ${APP_COZE_IMAGE_STYLE_HINT:营养师生成餐单配图，图上禁止出现任何文字，干净、柔和、真实食材质感}

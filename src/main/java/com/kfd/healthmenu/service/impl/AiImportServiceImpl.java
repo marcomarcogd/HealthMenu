@@ -39,7 +39,7 @@ public class AiImportServiceImpl implements AiImportService {
     @Value("${app.coze.image-workflow:image}")
     private String imageWorkflow;
 
-    @Value("${app.coze.image-style-hint:营养师海报风，干净、柔和、真实食材质感}")
+    @Value("${app.coze.image-style-hint:营养师生成餐单配图，图上禁止出现任何文字，干净、柔和、真实食材质感}")
     private String imageStyleHint;
 
     @Override

@@ -430,11 +430,12 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
             mealForm.setMealCode(meal.getMealCode());
             mealForm.setMealName(meal.getMealName());
             mealForm.setTimeLabel(meal.getTimeLabel());
+            mealForm.setMealTime(meal.getTimeLabel());
             mealForm.setSortOrder(meal.getSortOrder());
 
             CustomerMenuMealForm aiMeal = findAiMeal(aiImportResultDto, meal.getMealCode(), meal.getMealName());
             if (aiMeal != null) {
-                mealForm.setMealTime(aiMeal.getMealTime());
+                mealForm.setMealTime(StringUtils.hasText(aiMeal.getMealTime()) ? aiMeal.getMealTime() : meal.getTimeLabel());
             }
 
             for (MenuTemplateMealItem item : templateService.listMealItems(meal.getId())) {
@@ -468,7 +469,7 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
                     extraMeal.setMealCode(aiMeal.getMealCode());
                     extraMeal.setMealName(aiMeal.getMealName());
                     extraMeal.setTimeLabel(aiMeal.getTimeLabel());
-                    extraMeal.setMealTime(aiMeal.getMealTime());
+                    extraMeal.setMealTime(StringUtils.hasText(aiMeal.getMealTime()) ? aiMeal.getMealTime() : aiMeal.getTimeLabel());
                     extraMeal.setSortOrder(form.getMeals().size() + 1);
                     if (aiMeal.getItems() != null) {
                         for (CustomerMenuMealItemForm aiItem : aiMeal.getItems()) {

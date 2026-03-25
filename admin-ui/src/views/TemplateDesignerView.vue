@@ -589,7 +589,9 @@ onBeforeUnmount(() => {
         <el-form v-else-if="selectedPanel === 'meal' && selectedMeal" label-position="top">
           <el-form-item label="餐次名称"><el-input v-model="selectedMeal.mealName" @input="markDirty" /></el-form-item>
           <el-form-item label="餐次编码"><el-input v-model="selectedMeal.mealCode" @input="markDirty" /></el-form-item>
-          <el-form-item label="时间说明"><el-input v-model="selectedMeal.timeLabel" @input="markDirty" /></el-form-item>
+          <el-form-item label="用餐时间/时段">
+            <el-input v-model="selectedMeal.timeLabel" placeholder="例如 07:30 / 上午加餐 / 训练后" @input="markDirty" />
+          </el-form-item>
           <el-form-item label="是否启用"><el-switch v-model="selectedMeal.enabled" @change="markDirty" /></el-form-item>
         </el-form>
 

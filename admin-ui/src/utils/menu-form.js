@@ -58,6 +58,7 @@ export function normalizeMenuForm(payload = {}) {
       timeLabel: '',
       mealTime: '',
       ...meal,
+      mealTime: meal?.mealTime || meal?.timeLabel || '',
       sortOrder: meal?.sortOrder ?? mealIndex + 1,
       items: Array.isArray(meal?.items) ? meal.items.map((item, itemIndex) => ({
         itemCode: '',

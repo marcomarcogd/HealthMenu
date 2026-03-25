@@ -242,6 +242,17 @@ class CustomerMenuServiceImplTest {
     }
 
     @Test
+    void buildCreateForm_shouldPrefillMealTimeFromTemplateTimeLabel() {
+        CustomerMenuForm form = customerMenuService.buildCreateForm(2001L, 1001L);
+
+        assertThat(form.getMeals()).isNotEmpty();
+        assertThat(form.getMeals()).allSatisfy(meal -> {
+            assertThat(meal.getTimeLabel()).isNotBlank();
+            assertThat(meal.getMealTime()).isEqualTo(meal.getTimeLabel());
+        });
+    }
+
+    @Test
     void publishMenu_shouldUpdateStatusAndCreateShareRecord() {
         CustomerMenuForm form = new CustomerMenuForm();
         form.setCustomerId(2001L);

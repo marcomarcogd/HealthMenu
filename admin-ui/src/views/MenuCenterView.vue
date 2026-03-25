@@ -1112,7 +1112,7 @@ watch(
 
           <div class="editor-block" v-for="(meal, mealIndex) in menuForm.meals" :key="`meal-${mealIndex}`">
             <div class="editor-title">{{ meal.mealName }}</div>
-            <el-input v-model="meal.mealTime" placeholder="餐次时间" @input="markDirty" />
+            <el-input v-model="meal.mealTime" placeholder="用餐时间/时段，可沿用模板预设后再临时调整" @input="markDirty" />
             <div class="meal-item-grid">
               <div
                 v-for="(item, itemIndex) in meal.items"

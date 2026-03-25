@@ -156,6 +156,20 @@ CREATE TABLE IF NOT EXISTS ai_import_record (
     deleted TINYINT NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS sys_user (
+    id BIGINT PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    display_name VARCHAR(64) NOT NULL,
+    role_code VARCHAR(32) NOT NULL,
+    status TINYINT NOT NULL DEFAULT 1,
+    last_login_at TIMESTAMP,
+    create_time TIMESTAMP NOT NULL,
+    update_time TIMESTAMP NOT NULL,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    CONSTRAINT uk_sys_user_username UNIQUE (username)
+);
+
 CREATE TABLE IF NOT EXISTS sys_dict_type (
     id BIGINT PRIMARY KEY,
     type_code VARCHAR(64) NOT NULL,

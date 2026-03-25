@@ -1,11 +1,13 @@
 import axios from 'axios'
 import { showErrorMessage } from '../utils/message'
+import { redirectToLogin } from '../utils/auth-redirect'
 
 const baseURL = import.meta.env.VITE_ADMIN_API_BASE_URL || '/api/admin'
 
 const request = axios.create({
   baseURL,
   timeout: 15000,
+  withCredentials: true,
 })
 
 request.interceptors.response.use(
@@ -20,14 +22,24 @@ request.interceptors.response.use(
   },
   (error) => {
     const message = resolveRequestErrorMessage(error)
-    showErrorMessage(message)
-    return Promise.reject(new Error(message))
+    if (!error?.config?.silentErrorMessage) {
+      showErrorMessage(message)
+    }
+    if (error?.response?.status === 401 && !error?.config?.skipAuthRedirect) {
+      redirectToLogin()
+    }
+    return Promise.reject(createRequestError(error, message))
   },
 )
 
 export default request
 
 function resolveRequestErrorMessage(error) {
+  const responseMessage = error?.response?.data?.message
+  if (responseMessage) {
+    return responseMessage
+  }
+
   if (error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')) {
     const url = error?.config?.url || ''
     if (url.includes('/menus/ai/parse')) {
@@ -43,6 +55,13 @@ function resolveRequestErrorMessage(error) {
   }
 
   return error?.message || '网络异常'
+}
+
+function createRequestError(error, message) {
+  const wrapped = new Error(message)
+  wrapped.status = error?.response?.status
+  wrapped.code = error?.response?.data?.code || error?.code
+  return wrapped
 }
 
 function looksLikeAiInit(rawData) {

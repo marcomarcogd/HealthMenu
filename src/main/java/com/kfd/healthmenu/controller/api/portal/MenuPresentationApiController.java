@@ -10,6 +10,9 @@ import com.kfd.healthmenu.entity.CustomerMenu;
 import com.kfd.healthmenu.mapper.CustomerMenuMapper;
 import com.kfd.healthmenu.service.CustomerMenuService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +32,11 @@ public class MenuPresentationApiController {
                 .eq(CustomerMenu::getId, id)
                 .eq(CustomerMenu::getDeleted, 0)
                 .last("limit 1"));
+        if (menu != null
+                && !RecordStatus.PUBLISHED.name().equals(menu.getStatus())
+                && !isLoggedIn()) {
+            throw new BizException("MENU_LOGIN_REQUIRED", "餐单尚未发布，请先登录后台后查看预览");
+        }
         return ApiResponse.success(buildPayload(menu, false));
     }
 
@@ -57,5 +65,12 @@ public class MenuPresentationApiController {
         dto.setMenuForm(form);
         dto.setShareMode(shareMode);
         return dto;
+    }
+
+    private boolean isLoggedIn() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 }

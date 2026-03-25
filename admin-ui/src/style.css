@@ -75,6 +75,10 @@ body {
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 10px 30px rgba(31, 42, 68, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
 }
 
 .topbar-title {
@@ -85,6 +89,27 @@ body {
 
 .topbar-subtitle {
   margin-top: 8px;
+  color: #6a7890;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.topbar-user-meta {
+  text-align: right;
+}
+
+.topbar-user-name {
+  font-weight: 700;
+  color: #20304f;
+}
+
+.topbar-user-role {
+  margin-top: 4px;
+  font-size: 13px;
   color: #6a7890;
 }
 
@@ -369,6 +394,48 @@ body {
   background: #e8edf5;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-panel {
+  width: min(100%, 460px);
+  padding: 34px 32px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 50px rgba(31, 42, 68, 0.12);
+}
+
+.login-header {
+  margin-bottom: 24px;
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #20304f;
+}
+
+.login-subtitle {
+  margin-top: 10px;
+  color: #6a7890;
+}
+
+.login-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.login-tip {
+  margin-top: 18px;
+  color: #6a7890;
+  font-size: 13px;
+}
+
 @media (max-width: 1100px) {
   .admin-shell {
     grid-template-columns: 1fr;
@@ -379,5 +446,19 @@ body {
   .dict-layout,
   .designer-layout {
     grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .topbar-user {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .topbar-user-meta {
+    text-align: left;
   }
 }

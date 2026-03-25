@@ -156,6 +156,20 @@ CREATE TABLE IF NOT EXISTS ai_import_record (
     deleted TINYINT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS sys_user (
+    id BIGINT PRIMARY KEY,
+    username VARCHAR(64) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    display_name VARCHAR(64) NOT NULL,
+    role_code VARCHAR(32) NOT NULL,
+    status TINYINT NOT NULL DEFAULT 1,
+    last_login_at DATETIME,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    UNIQUE KEY uk_sys_user_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS sys_dict_type (
     id BIGINT PRIMARY KEY,
     type_code VARCHAR(64) NOT NULL,

@@ -2,6 +2,8 @@ package com.kfd.healthmenu.controller.api.admin;
 
 import com.kfd.healthmenu.common.BizException;
 import com.kfd.healthmenu.dto.api.ApiResponse;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.BindException;
 import org.springframework.validation.BindingResult;
@@ -27,7 +29,12 @@ public class AdminApiExceptionHandler {
             Map.entry("itemCode", "字段编码"),
             Map.entry("itemName", "字段名称"),
             Map.entry("sectionType", "区块类型"),
-            Map.entry("title", "标题")
+            Map.entry("title", "标题"),
+            Map.entry("username", "账号"),
+            Map.entry("displayName", "姓名"),
+            Map.entry("roleCode", "角色"),
+            Map.entry("status", "状态"),
+            Map.entry("password", "密码")
     );
 
     @ExceptionHandler(BizException.class)
@@ -45,6 +52,16 @@ public class AdminApiExceptionHandler {
                 .map(this::resolveValidationMessage)
                 .orElse("请求参数校验失败");
         return ApiResponse.fail("VALIDATION_ERROR", message);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ApiResponse<Void> handleAuthentication(AuthenticationException ex) {
+        return ApiResponse.fail("UNAUTHORIZED", ex.getMessage() == null ? "请先登录后台账号" : ex.getMessage());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ApiResponse<Void> handleAccessDenied(AccessDeniedException ex) {
+        return ApiResponse.fail("FORBIDDEN", ex.getMessage() == null ? "当前账号没有访问该功能的权限" : ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

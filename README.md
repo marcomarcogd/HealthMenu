@@ -58,6 +58,7 @@ Recommended database defaults:
 
 - Database charset: `utf8mb4`
 - Database collation: `utf8mb4_unicode_ci`
+- Keep the local JDBC URL on `utf8mb4` as well. If you use `src/main/resources/application-local.yaml`, make sure its `spring.datasource.url` also includes `characterEncoding=utf8mb4` and `connectionCollation=utf8mb4_unicode_ci`, otherwise Chinese content can become mojibake in the local MySQL database.
 
 Optional share and upload overrides:
 

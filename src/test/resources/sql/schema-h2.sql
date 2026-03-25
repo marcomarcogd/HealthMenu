@@ -170,6 +170,22 @@ CREATE TABLE IF NOT EXISTS sys_user (
     CONSTRAINT uk_sys_user_username UNIQUE (username)
 );
 
+CREATE TABLE IF NOT EXISTS sys_user_audit_log (
+    id BIGINT PRIMARY KEY,
+    target_user_id BIGINT NOT NULL,
+    target_username VARCHAR(64) NOT NULL,
+    target_display_name VARCHAR(64),
+    operator_user_id BIGINT,
+    operator_username VARCHAR(64),
+    operator_display_name VARCHAR(64),
+    action_code VARCHAR(32) NOT NULL,
+    action_label VARCHAR(64) NOT NULL,
+    detail VARCHAR(500),
+    create_time TIMESTAMP NOT NULL,
+    update_time TIMESTAMP NOT NULL,
+    deleted TINYINT NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS sys_dict_type (
     id BIGINT PRIMARY KEY,
     type_code VARCHAR(64) NOT NULL,

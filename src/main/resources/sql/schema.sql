@@ -170,6 +170,22 @@ CREATE TABLE IF NOT EXISTS sys_user (
     UNIQUE KEY uk_sys_user_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS sys_user_audit_log (
+    id BIGINT PRIMARY KEY,
+    target_user_id BIGINT NOT NULL,
+    target_username VARCHAR(64) NOT NULL,
+    target_display_name VARCHAR(64),
+    operator_user_id BIGINT,
+    operator_username VARCHAR(64),
+    operator_display_name VARCHAR(64),
+    action_code VARCHAR(32) NOT NULL,
+    action_label VARCHAR(64) NOT NULL,
+    detail VARCHAR(500),
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    deleted TINYINT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS sys_dict_type (
     id BIGINT PRIMARY KEY,
     type_code VARCHAR(64) NOT NULL,

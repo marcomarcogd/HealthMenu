@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteUser, listUsers, resetUserPassword, saveUser } from '../api/user'
+import { listUserAuditLogs } from '../api/user-audit'
 import { ROLE_PERMISSION_SUMMARIES } from '../constants/permissions'
 import { useAuthStore } from '../stores/auth'
 
@@ -11,8 +12,12 @@ const saving = ref(false)
 const resetting = ref(false)
 const dialogVisible = ref(false)
 const resetDialogVisible = ref(false)
+const auditDrawerVisible = ref(false)
+const auditLoading = ref(false)
 const searchKeyword = ref('')
 const users = ref([])
+const auditLogs = ref([])
+const auditTitle = ref('账号操作审计')
 
 const roleOptions = [
   { label: '管理员', value: 'ADMIN', summary: ROLE_PERMISSION_SUMMARIES.ADMIN },
@@ -91,6 +96,20 @@ function openResetDialog(row) {
     password: '',
   })
   resetDialogVisible.value = true
+}
+
+async function openAuditDrawer(row = null) {
+  auditTitle.value = row ? `账号操作审计 · ${row.displayName}` : '账号操作审计'
+  auditDrawerVisible.value = true
+  auditLoading.value = true
+  try {
+    auditLogs.value = await listUserAuditLogs(row?.id)
+  } catch (error) {
+    auditLogs.value = []
+    ElMessage.error(error?.message || '审计日志加载失败')
+  } finally {
+    auditLoading.value = false
+  }
 }
 
 async function loadUsers() {
@@ -191,6 +210,7 @@ onMounted(async () => {
         <span>账号管理</span>
         <div class="action-row">
           <el-input v-model="searchKeyword" placeholder="按账号、姓名、角色搜索" clearable class="user-search" />
+          <el-button @click="openAuditDrawer()">查看审计</el-button>
           <el-button type="primary" @click="openCreateDialog">新建账号</el-button>
         </div>
       </div>
@@ -220,6 +240,7 @@ onMounted(async () => {
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
+            <el-button link type="primary" @click="openAuditDrawer(row)">记录</el-button>
             <el-button link type="primary" @click="openResetDialog(row)">重置密码</el-button>
             <el-button
               link
@@ -285,6 +306,28 @@ onMounted(async () => {
       </div>
     </template>
   </el-dialog>
+
+  <el-drawer v-model="auditDrawerVisible" title="账号操作审计" size="780px">
+    <div class="audit-headline">{{ auditTitle }}</div>
+    <div v-loading="auditLoading">
+      <el-table :data="auditLogs" empty-text="暂无审计记录">
+        <el-table-column label="时间" min-width="160">
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column prop="actionLabel" label="操作" width="120" />
+        <el-table-column label="操作人" min-width="140">
+          <template #default="{ row }">{{ row.operatorDisplayName || row.operatorUsername || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="目标账号" min-width="160">
+          <template #default="{ row }">
+            {{ row.targetDisplayName || row.targetUsername || '-' }}
+            <span class="audit-secondary">（{{ row.targetUsername || '-' }}）</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="detail" label="说明" min-width="280" />
+      </el-table>
+    </div>
+  </el-drawer>
 </template>
 
 <style scoped>
@@ -296,5 +339,15 @@ onMounted(async () => {
   margin-top: 8px;
   font-size: 13px;
   color: #6a7890;
+}
+
+.audit-headline {
+  margin-bottom: 14px;
+  color: #6a7890;
+}
+
+.audit-secondary {
+  color: #7c8aa3;
+  font-size: 12px;
 }
 </style>

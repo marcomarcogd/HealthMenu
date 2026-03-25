@@ -3,10 +3,14 @@ package com.kfd.healthmenu.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kfd.healthmenu.common.BizException;
 import com.kfd.healthmenu.common.UserRole;
+import com.kfd.healthmenu.common.UserAuditAction;
 import com.kfd.healthmenu.dto.auth.CurrentUserDto;
+import com.kfd.healthmenu.dto.auth.UserAuditLogDto;
 import com.kfd.healthmenu.dto.auth.UserSaveRequest;
 import com.kfd.healthmenu.dto.auth.UserSummaryDto;
 import com.kfd.healthmenu.entity.SysUser;
+import com.kfd.healthmenu.entity.SysUserAuditLog;
+import com.kfd.healthmenu.mapper.SysUserAuditLogMapper;
 import com.kfd.healthmenu.mapper.SysUserMapper;
 import com.kfd.healthmenu.security.RolePermissionResolver;
 import com.kfd.healthmenu.service.AccountService;
@@ -24,6 +28,7 @@ import java.util.List;
 public class AccountServiceImpl implements AccountService {
 
     private final SysUserMapper sysUserMapper;
+    private final SysUserAuditLogMapper sysUserAuditLogMapper;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -38,12 +43,25 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    public List<UserAuditLogDto> listAuditLogs(Long targetUserId) {
+        return sysUserAuditLogMapper.selectList(new LambdaQueryWrapper<SysUserAuditLog>()
+                        .eq(SysUserAuditLog::getDeleted, 0)
+                        .eq(targetUserId != null, SysUserAuditLog::getTargetUserId, targetUserId)
+                        .orderByDesc(SysUserAuditLog::getCreateTime)
+                        .orderByDesc(SysUserAuditLog::getId))
+                .stream()
+                .map(this::toAuditLogDto)
+                .toList();
+    }
+
+    @Override
     @Transactional
-    public UserSummaryDto saveUser(UserSaveRequest request) {
+    public UserSummaryDto saveUser(UserSaveRequest request, Long operatorUserId) {
         String username = normalizeUsername(request.getUsername());
         String displayName = normalizeText(request.getDisplayName());
         String roleCode = normalizeRoleCode(request.getRoleCode());
         Integer status = normalizeStatus(request.getStatus());
+        SysUser operator = findById(operatorUserId);
 
         SysUser duplicate = findByUsername(username);
         if (duplicate != null && !duplicate.getId().equals(request.getId())) {
@@ -58,11 +76,13 @@ public class AccountServiceImpl implements AccountService {
             user.setStatus(status);
             user.setPassword(passwordEncoder.encode(requireValidPassword(request.getPassword(), true)));
             sysUserMapper.insert(user);
+            writeAuditLog(operator, user, UserAuditAction.CREATE, buildCreateDetail(user));
             return toSummary(sysUserMapper.selectById(user.getId()));
         }
 
         SysUser existing = requireUser(request.getId());
         ensureLastAdminWillRemain(existing, roleCode, status);
+        String detail = buildUpdateDetail(existing, username, displayName, roleCode, status, StringUtils.hasText(request.getPassword()));
 
         existing.setUsername(username);
         existing.setDisplayName(displayName);
@@ -72,17 +92,20 @@ public class AccountServiceImpl implements AccountService {
             existing.setPassword(passwordEncoder.encode(requireValidPassword(request.getPassword(), false)));
         }
         sysUserMapper.updateById(existing);
+        writeAuditLog(operator, existing, UserAuditAction.UPDATE, detail);
         return toSummary(sysUserMapper.selectById(existing.getId()));
     }
 
     @Override
     @Transactional
-    public void resetPassword(Long userId, String password) {
+    public void resetPassword(Long userId, String password, Long operatorUserId) {
         SysUser user = requireUser(userId);
+        SysUser operator = findById(operatorUserId);
         SysUser update = new SysUser();
         update.setId(user.getId());
         update.setPassword(passwordEncoder.encode(requireValidPassword(password, false)));
         sysUserMapper.updateById(update);
+        writeAuditLog(operator, user, UserAuditAction.RESET_PASSWORD, "重置了该账号的登录密码");
     }
 
     @Override
@@ -95,7 +118,9 @@ public class AccountServiceImpl implements AccountService {
             throw new BizException("DELETE_SELF_FORBIDDEN", "不能删除当前登录账号");
         }
         SysUser user = requireUser(userId);
+        SysUser operator = findById(operatorUserId);
         ensureLastAdminWillRemain(user, user.getRoleCode(), 0);
+        writeAuditLog(operator, user, UserAuditAction.DELETE, "删除了该账号");
         sysUserMapper.deleteById(userId);
     }
 
@@ -123,9 +148,20 @@ public class AccountServiceImpl implements AccountService {
         sysUserMapper.updateById(update);
     }
 
-    private SysUser requireUser(Long userId) {
+    private SysUser findById(Long userId) {
+        if (userId == null) {
+            return null;
+        }
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null || Integer.valueOf(1).equals(user.getDeleted())) {
+            return null;
+        }
+        return user;
+    }
+
+    private SysUser requireUser(Long userId) {
+        SysUser user = findById(userId);
+        if (user == null) {
             throw new BizException("USER_NOT_FOUND", "未找到对应账号");
         }
         return user;
@@ -218,5 +254,77 @@ public class AccountServiceImpl implements AccountService {
         } catch (IllegalArgumentException ex) {
             return roleCode;
         }
+    }
+
+    private String buildCreateDetail(SysUser user) {
+        return "创建账号，角色="
+                + resolveRoleLabel(user.getRoleCode())
+                + "，状态="
+                + (Integer.valueOf(1).equals(user.getStatus()) ? "启用" : "停用");
+    }
+
+    private String buildUpdateDetail(SysUser existing,
+                                     String username,
+                                     String displayName,
+                                     String roleCode,
+                                     Integer status,
+                                     boolean passwordUpdated) {
+        List<String> changes = new java.util.ArrayList<>();
+        if (!existing.getUsername().equals(username)) {
+            changes.add("账号：" + existing.getUsername() + " -> " + username);
+        }
+        if (!existing.getDisplayName().equals(displayName)) {
+            changes.add("姓名：" + existing.getDisplayName() + " -> " + displayName);
+        }
+        if (!existing.getRoleCode().equals(roleCode)) {
+            changes.add("角色：" + resolveRoleLabel(existing.getRoleCode()) + " -> " + resolveRoleLabel(roleCode));
+        }
+        if (!existing.getStatus().equals(status)) {
+            changes.add("状态：" + (Integer.valueOf(1).equals(existing.getStatus()) ? "启用" : "停用")
+                    + " -> "
+                    + (Integer.valueOf(1).equals(status) ? "启用" : "停用"));
+        }
+        if (passwordUpdated) {
+            changes.add("同时更新了登录密码");
+        }
+        if (changes.isEmpty()) {
+            return "编辑账号，但关键信息未变化";
+        }
+        return String.join("；", changes);
+    }
+
+    private void writeAuditLog(SysUser operator,
+                               SysUser target,
+                               UserAuditAction action,
+                               String detail) {
+        SysUserAuditLog log = new SysUserAuditLog();
+        log.setTargetUserId(target.getId());
+        log.setTargetUsername(target.getUsername());
+        log.setTargetDisplayName(target.getDisplayName());
+        if (operator != null) {
+            log.setOperatorUserId(operator.getId());
+            log.setOperatorUsername(operator.getUsername());
+            log.setOperatorDisplayName(operator.getDisplayName());
+        }
+        log.setActionCode(action.getCode());
+        log.setActionLabel(action.getLabel());
+        log.setDetail(detail);
+        sysUserAuditLogMapper.insert(log);
+    }
+
+    private UserAuditLogDto toAuditLogDto(SysUserAuditLog log) {
+        UserAuditLogDto dto = new UserAuditLogDto();
+        dto.setId(log.getId());
+        dto.setTargetUserId(log.getTargetUserId());
+        dto.setTargetUsername(log.getTargetUsername());
+        dto.setTargetDisplayName(log.getTargetDisplayName());
+        dto.setOperatorUserId(log.getOperatorUserId());
+        dto.setOperatorUsername(log.getOperatorUsername());
+        dto.setOperatorDisplayName(log.getOperatorDisplayName());
+        dto.setActionCode(log.getActionCode());
+        dto.setActionLabel(log.getActionLabel());
+        dto.setDetail(log.getDetail());
+        dto.setCreateTime(log.getCreateTime());
+        return dto;
     }
 }

@@ -99,6 +99,50 @@ class AdminUserApiControllerTest {
                 .andExpect(jsonPath("$.code").value("DELETE_SELF_FORBIDDEN"));
     }
 
+    @Test
+    void audits_shouldRecordCreateResetAndDelete() throws Exception {
+        mockMvc.perform(post("/api/admin/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "audit01",
+                                  "displayName": "审计账号",
+                                  "roleCode": "HEALTH_MANAGER",
+                                  "status": 1,
+                                  "password": "Audit@123456"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        SysUser target = sysUserMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, "audit01")
+                .last("limit 1"));
+
+        mockMvc.perform(post("/api/admin/users/{id}/reset-password", target.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "password": "Audit@654321"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(delete("/api/admin/users/{id}", target.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(get("/api/admin/users/audits").param("targetUserId", String.valueOf(target.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].actionCode").value("DELETE"))
+                .andExpect(jsonPath("$.data[1].actionCode").value("RESET_PASSWORD"))
+                .andExpect(jsonPath("$.data[2].actionCode").value("CREATE"))
+                .andExpect(jsonPath("$.data[0].operatorUsername").value("admin"));
+    }
+
     private SysUser createUser(String username, UserRole role) {
         SysUser user = new SysUser();
         user.setUsername(username);

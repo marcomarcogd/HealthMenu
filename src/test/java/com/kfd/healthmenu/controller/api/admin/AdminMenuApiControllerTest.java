@@ -195,7 +195,8 @@ class AdminMenuApiControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("请选择餐单日期"));
     }
 
     @Test
@@ -286,7 +287,23 @@ class AdminMenuApiControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("请先输入要解析的 AI 文本"));
+    }
+
+    @Test
+    void generateImage_withoutPrompt_shouldReturnValidationResponse() throws Exception {
+        mockMvc.perform(post("/api/admin/menus/ai/generate-image")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "prompt": ""
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("请先输入 AI 生图提示词"));
     }
 
     private CustomerMenuForm buildBaseForm(String title) {

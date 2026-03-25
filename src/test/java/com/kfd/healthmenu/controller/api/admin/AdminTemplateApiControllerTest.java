@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -51,7 +52,8 @@ class AdminTemplateApiControllerTest {
 
     @Test
     void saveDesign_shouldPersistAndEchoSortedStructure() throws Exception {
-        when(templateService.saveDesign(any(TemplateDesignSaveRequest.class))).thenReturn(buildTemplateDesign());
+        when(templateService.saveDesign(argThat((TemplateDesignSaveRequest request) -> request != null && request.getId() == 1001L)))
+                .thenReturn(buildTemplateDesign());
 
         String requestBody = """
                 {
@@ -110,9 +112,10 @@ class AdminTemplateApiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.message").value("must not be null"));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("模板结构保存成功"))
+                .andExpect(jsonPath("$.data.id").value("1001"))
+                .andExpect(jsonPath("$.data.sections[0].title").value("专属标题"));
     }
 
     @Test

@@ -6,9 +6,9 @@ import lombok.Data;
 @Data
 public class TemplateSectionSaveRequest {
     private Long id;
-    @NotBlank
+    @NotBlank(message = "区块类型不能为空")
     private String sectionType;
-    @NotBlank
+    @NotBlank(message = "区块标题不能为空")
     private String title;
     private Boolean enabled;
     private Boolean allowImage;

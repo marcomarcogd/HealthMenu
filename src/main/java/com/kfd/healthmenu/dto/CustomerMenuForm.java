@@ -14,13 +14,13 @@ public class CustomerMenuForm {
 
     private Long id;
 
-    @NotNull
+    @NotNull(message = "请选择客户")
     private Long customerId;
 
-    @NotNull
+    @NotNull(message = "请选择模板")
     private Long templateId;
 
-    @NotNull
+    @NotNull(message = "请选择餐单日期")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate menuDate;
 

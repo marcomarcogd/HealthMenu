@@ -5,6 +5,6 @@ import lombok.Data;
 
 @Data
 public class AiMenuParseRequest {
-    @NotBlank
+    @NotBlank(message = "请先输入要解析的 AI 文本")
     private String sourceText;
 }

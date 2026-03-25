@@ -65,7 +65,6 @@ const menuFilters = ref({
 })
 
 const canInit = computed(() => selector.value.customerId && selector.value.templateId)
-const canSave = computed(() => menuForm.value.customerId && menuForm.value.templateId)
 const hasStepOneContent = computed(() => menuForm.value.sections.length || menuForm.value.meals.length)
 const dialogTitle = computed(() => (menuForm.value.id ? '编辑餐单' : '新建餐单'))
 const menuStatusOptions = computed(() => [
@@ -98,6 +97,19 @@ const draftAlertTitle = computed(() => {
   }
   return count === 1 ? '检测到 1 份未保存草稿' : `检测到 ${count} 份未保存草稿`
 })
+
+function validateMenuBeforeSubmit() {
+  if (!menuForm.value.customerId) {
+    return '请选择客户'
+  }
+  if (!menuForm.value.templateId) {
+    return '请选择模板'
+  }
+  if (!menuForm.value.menuDate) {
+    return '请先选择餐单日期'
+  }
+  return ''
+}
 
 async function refreshMenus(targetPage = pagination.value.page) {
   loading.value = true
@@ -594,11 +606,10 @@ async function previewAi() {
   try {
     const result = await parseMenuText(selector.value.sourceText)
     const summary = buildAiPreviewSummary(result)
-    if (result.parseMode === 'AI') {
-      ElMessage.success(summary)
-    } else {
-      ElMessage.warning(summary)
-    }
+    await ElMessageBox.alert(summary, 'AI 识别预览', {
+      type: result.parseMode === 'AI' ? 'success' : 'warning',
+      confirmButtonText: '继续',
+    })
   } catch (error) {
     ElMessage.error(error?.message || 'AI 解析失败')
   } finally {
@@ -682,8 +693,9 @@ function prevStep() {
 }
 
 async function submitMenu() {
-  if (!canSave.value) {
-    ElMessage.warning('餐单基础信息不完整')
+  const validationMessage = validateMenuBeforeSubmit()
+  if (validationMessage) {
+    ElMessage.warning(validationMessage)
     return
   }
   saving.value = true
@@ -1030,9 +1042,13 @@ watch(
               :rows="8"
               placeholder="粘贴营养师文本，可先解析，再按模板初始化或 AI 预填"
             />
+            <div class="form-help-text">
+              “预览 AI 识别结果”只用于检查 AI 能识别出什么，不会创建餐单；
+              “AI 预填初始化”会把识别结果带入当前模板，生成可编辑的餐单草稿。
+            </div>
           </el-form-item>
           <div class="inline-actions">
-            <el-button :disabled="!selector.sourceText" @click="previewAi">先解析 AI 文本</el-button>
+            <el-button :disabled="!selector.sourceText" @click="previewAi">预览 AI 识别结果</el-button>
             <el-button type="primary" :disabled="!canInit" @click="initForm(false)">按模板初始化</el-button>
             <el-button type="success" :disabled="!canInit || !selector.sourceText" @click="initForm(true)">AI 预填初始化</el-button>
           </div>
@@ -1284,6 +1300,13 @@ watch(
   margin-top: 18px;
   display: flex;
   justify-content: flex-end;
+}
+
+.form-help-text {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 @media (max-width: 900px) {

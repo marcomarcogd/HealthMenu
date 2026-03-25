@@ -10,9 +10,9 @@ import java.util.List;
 @Data
 public class TemplateMealSaveRequest {
     private Long id;
-    @NotBlank
+    @NotBlank(message = "餐次编码不能为空")
     private String mealCode;
-    @NotBlank
+    @NotBlank(message = "餐次名称不能为空")
     private String mealName;
     private String timeLabel;
     private Boolean enabled;

@@ -5,6 +5,6 @@ import lombok.Data;
 
 @Data
 public class AiImageGenerateRequest {
-    @NotBlank
+    @NotBlank(message = "请先输入 AI 生图提示词")
     private String prompt;
 }

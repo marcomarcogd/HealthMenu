@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
@@ -373,6 +374,7 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         CustomerMenuForm form = new CustomerMenuForm();
         form.setCustomerId(customerId);
         form.setTemplateId(templateId);
+        form.setMenuDate(LocalDate.now());
         form.setShowSwapGuide(true);
         form.setShowWeeklyTip(true);
         form.setStatus(RecordStatus.DRAFT.name());

@@ -8,7 +8,7 @@ import java.util.List;
 
 @Data
 public class MenuTemplateDesignForm {
-    @NotNull
+    @NotNull(message = "模板 ID 不能为空")
     private Long id;
     private String name;
     private String description;

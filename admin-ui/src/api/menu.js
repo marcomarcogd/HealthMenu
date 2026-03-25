@@ -1,20 +1,24 @@
 import axios from 'axios'
 import request from './request'
 
+const AI_PARSE_TIMEOUT = 60000
+const AI_INIT_TIMEOUT = 60000
+const AI_IMAGE_TIMEOUT = 120000
+
 export const listMenus = (params = {}) => request.get('/menus', { params })
 export const initMenuForm = (payload) => request.post('/menus/init', {
   ...payload,
   customerId: payload.customerId ? Number(payload.customerId) : null,
   templateId: payload.templateId ? Number(payload.templateId) : null,
-})
+}, payload?.useAi ? { timeout: AI_INIT_TIMEOUT } : undefined)
 export const getMenuDetail = (id) => request.get(`/menus/${id}`)
 export const saveMenu = (payload) => request.post('/menus', {
   ...payload,
   customerId: payload.customerId ? Number(payload.customerId) : null,
   templateId: payload.templateId ? Number(payload.templateId) : null,
 })
-export const parseMenuText = (sourceText) => request.post('/menus/ai/parse', { sourceText })
-export const generateMenuImage = (prompt) => request.post('/menus/ai/generate-image', { prompt })
+export const parseMenuText = (sourceText) => request.post('/menus/ai/parse', { sourceText }, { timeout: AI_PARSE_TIMEOUT })
+export const generateMenuImage = (prompt) => request.post('/menus/ai/generate-image', { prompt }, { timeout: AI_IMAGE_TIMEOUT })
 export const publishMenu = (id) => request.post(`/menus/${id}/publish`)
 export const publishMenus = (ids) => request.post('/menus/batch/publish', {
   ids: normalizeIds(ids),

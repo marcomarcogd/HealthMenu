@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
 
     <div v-else-if="menuForm" ref="cardRef" class="presentation-card">
       <div class="presentation-header">
-        <img class="presentation-logo" :src="logoSrc" alt="康服团">
+        <img class="presentation-logo" :src="logoSrc" alt="康服到">
         <div class="presentation-title">{{ title }}</div>
       </div>
 

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const backendTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080'
+const backendTarget = process.env.VITE_DEV_PROXY_TARGET || 'https://k.kangxi365.cn'
 
 // https://vite.dev/config/
 export default defineConfig({

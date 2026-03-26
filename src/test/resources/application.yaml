@@ -27,7 +27,7 @@ mybatis-plus:
 app:
   upload-dir: uploads-test
   share:
-    base-url: http://localhost:8080
+    base-url: http://localhost:8001
   ai-import:
     enabled: false
     provider: mock

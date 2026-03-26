@@ -84,6 +84,9 @@ const selectedPublishableIds = computed(() => selectedMenuRows.value
   .map((item) => item.id))
 const hasWeeklyTipSection = computed(() => menuForm.value.sections.some((section) => section.sectionType === 'WEEKLY_TIP'))
 const hasSwapGuideSection = computed(() => menuForm.value.sections.some((section) => section.sectionType === 'SWAP_GUIDE'))
+const requiresInitialSave = computed(() => !menuForm.value.id && hasMenuContent(menuForm.value))
+const saveButtonText = computed(() => (requiresInitialSave.value ? '保存餐单' : '保存修改'))
+const previewPublishButtonText = computed(() => (dirty.value ? '保存并发布' : '发布餐单'))
 const menuSummary = computed(() => {
   const total = pagination.value.total
   const visible = menus.value.length
@@ -152,6 +155,21 @@ async function loadOptions() {
 
 function markDirty() {
   dirty.value = true
+}
+
+function applyMenuDetail(detail, fallbackLinks = {}) {
+  const normalized = normalizeMenuForm(detail)
+  menuForm.value = normalized
+  selector.value.customerId = normalized.customerId || selector.value.customerId
+  selector.value.templateId = normalized.templateId || selector.value.templateId
+  if (normalized.id) {
+    activeDraftKey.value = `${MENU_EDITOR_DRAFT_NAMESPACE}:${normalized.id}`
+  }
+  lastSavedLinks.value = {
+    viewUrl: normalized.viewUrl || fallbackLinks.viewUrl || '',
+    shareUrl: normalized.shareUrl || fallbackLinks.shareUrl || '',
+  }
+  dirty.value = false
 }
 
 function resetEditor() {
@@ -452,7 +470,7 @@ async function restoreEditorDraft(draft) {
       shareUrl: parsed?.lastSavedLinks?.shareUrl || '',
     }
     currentStep.value = Math.min(Math.max(Number(parsed?.currentStep || 0), 0), 2)
-    dirty.value = parsed?.dirty !== false || hasMenuContent(parsed?.menuForm)
+    dirty.value = parsed?.dirty !== false
     activeDraftKey.value = storageKey
     editorVisible.value = true
     syncRecoverableDrafts()
@@ -571,12 +589,16 @@ function clearImage(target) {
 }
 
 async function confirmDiscardChanges() {
-  if (!dirty.value && !hasMenuContent(menuForm.value)) {
+  if (!dirty.value && !requiresInitialSave.value) {
     return true
   }
 
+  const message = dirty.value
+    ? '当前餐单还有未保存修改，确认丢弃并继续吗？'
+    : '当前餐单还未保存，关闭后本次生成的内容会丢失，确认继续吗？'
+
   try {
-    await ElMessageBox.confirm('当前餐单有未保存修改，确认丢弃并继续吗？', '未保存提醒', {
+    await ElMessageBox.confirm(message, '未保存提醒', {
       type: 'warning',
       confirmButtonText: '丢弃修改',
       cancelButtonText: '继续编辑',
@@ -657,16 +679,11 @@ async function editMenu(row) {
     if (!detail?.id) {
       throw new Error('餐单不存在或已删除')
     }
-    menuForm.value = normalizeMenuForm(detail)
-    activeDraftKey.value = `${MENU_EDITOR_DRAFT_NAMESPACE}:${detail.id}`
-    selector.value.customerId = detail.customerId
-    selector.value.templateId = detail.templateId
-    lastSavedLinks.value = {
-      viewUrl: detail.viewUrl || row.viewUrl || '',
-      shareUrl: detail.shareUrl || row.shareUrl || '',
-    }
+    applyMenuDetail(detail, {
+      viewUrl: row.viewUrl || '',
+      shareUrl: row.shareUrl || '',
+    })
     currentStep.value = 1
-    dirty.value = false
     editorVisible.value = true
   } catch (error) {
     ElMessage.error(error?.message || '加载餐单失败')
@@ -701,11 +718,7 @@ async function refreshActiveMenuDetail(menuIds = []) {
   if (!detail?.id) {
     throw new Error('餐单操作成功，但重新加载详情失败')
   }
-  menuForm.value = detail
-  lastSavedLinks.value = {
-    viewUrl: detail.viewUrl || '',
-    shareUrl: detail.shareUrl || '',
-  }
+  applyMenuDetail(detail)
 }
 
 function nextStep() {
@@ -720,46 +733,59 @@ function prevStep() {
   currentStep.value = Math.max(currentStep.value - 1, 0)
 }
 
-async function submitMenu() {
+async function submitMenu({ publishAfterSave = false } = {}) {
   const validationMessage = validateMenuBeforeSubmit()
   if (validationMessage) {
     ElMessage.warning(validationMessage)
     return
   }
   saving.value = true
+  let saveCompleted = false
   try {
     const currentDraftStorageKey = resolveCurrentDraftKey({ createIfMissing: false })
     const result = await saveMenu(normalizeMenuSavePayload(menuForm.value))
-    menuForm.value.id = result.id
     const detail = normalizeMenuForm(await getMenuDetail(result.id))
     if (!detail?.id) {
       throw new Error('餐单保存成功，但重新加载详情失败')
     }
-    menuForm.value = detail
-    lastSavedLinks.value = {
-      viewUrl: detail.viewUrl || '',
-      shareUrl: detail.shareUrl || '',
+    applyMenuDetail(detail)
+    saveCompleted = true
+    clearEditorDraft(currentDraftStorageKey)
+    if (publishAfterSave) {
+      await publishMenu(detail.id)
+      const publishedDetail = normalizeMenuForm(await getMenuDetail(detail.id))
+      if (!publishedDetail?.id) {
+        throw new Error('餐单已发布，但重新加载详情失败')
+      }
+      applyMenuDetail(publishedDetail)
     }
     await refreshMenus()
     currentStep.value = 2
-    dirty.value = false
-    clearEditorDraft(currentDraftStorageKey)
-    ElMessage.success('餐单保存成功')
+    ElMessage.success(publishAfterSave ? '餐单已保存并发布' : '餐单已保存，可直接关闭或继续发布')
   } catch (error) {
-    ElMessage.error(error?.message || '餐单保存失败')
+    const fallbackMessage = publishAfterSave && saveCompleted ? '餐单已保存，但发布失败' : '餐单保存失败'
+    ElMessage.error(error?.message || fallbackMessage)
   } finally {
     saving.value = false
   }
 }
 
 async function publishCurrentMenu(row) {
+  const needsSaveFirst = row?.id === menuForm.value.id && dirty.value
+  const actionText = needsSaveFirst ? '保存并发布' : '发布'
+
   try {
-    await ElMessageBox.confirm(`确认发布餐单“${row.title || '未命名餐单'}”吗？`, '发布确认', {
+    await ElMessageBox.confirm(`确认${actionText}餐单“${row.title || '未命名餐单'}”吗？`, '发布确认', {
       type: 'warning',
-      confirmButtonText: '立即发布',
+      confirmButtonText: `立即${actionText}`,
       cancelButtonText: '取消',
     })
   } catch {
+    return
+  }
+
+  if (needsSaveFirst) {
+    await submitMenu({ publishAfterSave: true })
     return
   }
 
@@ -1043,6 +1069,7 @@ watch(
     <div v-loading="formLoading" class="menu-editor-shell">
       <div class="dialog-header-meta">
         <el-tag v-if="dirty" type="warning">未保存</el-tag>
+        <el-tag v-else-if="requiresInitialSave" type="info">待保存</el-tag>
       </div>
 
       <el-steps :active="currentStep" finish-status="success" simple>
@@ -1238,7 +1265,7 @@ watch(
         <div v-if="lastSavedLinks.viewUrl || lastSavedLinks.shareUrl" class="saved-link-panel">
           <div class="editor-title">成品交付</div>
           <div class="inline-actions">
-            <el-button v-if="canPublish(menuForm)" type="warning" plain @click="publishCurrentMenu(menuForm)">发布餐单</el-button>
+            <el-button v-if="canPublish(menuForm)" type="warning" plain @click="publishCurrentMenu(menuForm)">{{ previewPublishButtonText }}</el-button>
             <el-button v-if="menuForm.id" plain @click="exportExcel(menuForm)">导出 Excel</el-button>
             <el-button v-if="lastSavedLinks.viewUrl" type="success" @click="openUrl(lastSavedLinks.viewUrl)">立即查看</el-button>
             <el-button v-if="lastSavedLinks.shareUrl" @click="copyUrl(lastSavedLinks.shareUrl, '分享链接已复制')">复制链接</el-button>
@@ -1247,7 +1274,7 @@ watch(
 
         <div class="inline-actions">
           <el-button @click="prevStep">返回编辑</el-button>
-          <el-button type="primary" :loading="saving" :disabled="saving" @click="submitMenu">保存餐单</el-button>
+          <el-button type="primary" :loading="saving" :disabled="saving" @click="submitMenu">{{ saveButtonText }}</el-button>
         </div>
       </div>
     </div>

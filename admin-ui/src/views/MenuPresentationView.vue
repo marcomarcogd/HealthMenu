@@ -16,10 +16,21 @@ let html2canvasLoader = null
 const menuForm = computed(() => payload.value?.menuForm || null)
 const meals = computed(() => menuForm.value?.meals || [])
 const shareMode = computed(() => Boolean(payload.value?.shareMode))
-const title = computed(() => menuForm.value?.title || '专属餐单')
+const exclusiveTitleSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'EXCLUSIVE_TITLE') || null)
+const title = computed(() => exclusiveTitleSection.value?.content?.trim() || menuForm.value?.title || '专属餐单')
 const swapGuideSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'SWAP_GUIDE') || null)
 const weeklyTipSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'WEEKLY_TIP') || null)
 const extraSections = computed(() => (menuForm.value?.sections || []).filter((section) => !['SWAP_GUIDE', 'WEEKLY_TIP', 'EXCLUSIVE_TITLE', 'DAILY_MENU'].includes(section.sectionType)))
+const renderedMeals = computed(() => meals.value
+  .map((meal) => ({
+    ...meal,
+    items: (meal.items || []).filter((item) => hasRenderableMealItem(item)),
+  }))
+  .filter((meal) => meal.items.length > 0))
+
+function hasRenderableMealItem(item) {
+  return Boolean(item?.itemValue?.trim?.() || item?.imagePath)
+}
 
 async function loadMenu() {
   loading.value = true
@@ -245,7 +256,7 @@ onBeforeUnmount(() => {
 
       <div class="presentation-date">{{ menuForm.menuDate || '' }}</div>
 
-      <section v-for="meal in meals" :key="`${meal.mealCode}-${meal.sortOrder}`" class="presentation-meal">
+      <section v-for="meal in renderedMeals" :key="`${meal.mealCode}-${meal.sortOrder}`" class="presentation-meal">
         <div class="presentation-meal-side">
           <div class="presentation-meal-name">{{ meal.mealName }}</div>
           <div class="presentation-meal-time">{{ meal.mealTime || meal.timeLabel }}</div>

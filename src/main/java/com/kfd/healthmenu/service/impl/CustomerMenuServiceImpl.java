@@ -181,7 +181,7 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
             sectionForm.setColor("#2d2d2d");
             sectionForm.setAllowImage(isEnabled(section.getAllowImage()));
             if ("EXCLUSIVE_TITLE".equals(section.getSectionType())) {
-                sectionForm.setContent(form.getTitle());
+                sectionForm.setContent(resolveExclusiveTitle(customer, form));
             } else if ("WEEKLY_TIP".equals(section.getSectionType()) && aiImportResultDto != null) {
                 sectionForm.setContent(aiImportResultDto.getWeeklyTip());
             } else if ("SWAP_GUIDE".equals(section.getSectionType()) && aiImportResultDto != null) {
@@ -218,6 +218,7 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
             return null;
         }
         MenuTemplate template = templateService.getById(menu.getTemplateId());
+        Customer customer = menu.getCustomerId() == null ? null : customerMapper.selectById(menu.getCustomerId());
         CustomerMenuForm form = new CustomerMenuForm();
         form.setId(menu.getId());
         form.setCustomerId(menu.getCustomerId());
@@ -245,6 +246,7 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
             fillStyle(section.getStyleJson(), sectionForm);
             form.getSections().add(sectionForm);
         }
+        backfillExclusiveTitleSection(form, customer);
 
         List<CustomerMenuMeal> meals = mealMapper.selectList(new LambdaQueryWrapper<CustomerMenuMeal>()
                 .eq(CustomerMenuMeal::getCustomerMenuId, id)
@@ -375,8 +377,6 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         form.setCustomerId(customerId);
         form.setTemplateId(templateId);
         form.setMenuDate(LocalDate.now());
-        form.setShowSwapGuide(true);
-        form.setShowWeeklyTip(true);
         form.setStatus(RecordStatus.DRAFT.name());
         form.setTitle(buildDefaultTitle(customer, template));
         form.setThemeCode(template == null ? null : template.getThemeCode());
@@ -393,18 +393,13 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         if (form.getWeekIndex() == null) {
             form.setWeekIndex(1);
         }
-        if (form.getShowWeeklyTip() == null) {
-            form.setShowWeeklyTip(Boolean.TRUE);
-        }
-        if (form.getShowSwapGuide() == null) {
-            form.setShowSwapGuide(Boolean.TRUE);
-        }
         if (!StringUtils.hasText(form.getStatus())) {
             form.setStatus(RecordStatus.DRAFT.name());
         }
         if (!StringUtils.hasText(form.getThemeCode()) && template != null) {
             form.setThemeCode(template.getThemeCode());
         }
+        syncSectionVisibilityFlags(form);
         applyTemplateImageFlags(form);
         form.setThemeName(resolveThemeName(form.getThemeCode(), template));
         form.setStatusLabel(resolveStatusLabel(form.getStatus()));
@@ -524,6 +519,46 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         return customer.getName() + "的专属餐单";
     }
 
+    private String resolveExclusiveTitle(Customer customer, CustomerMenuForm form) {
+        if (customer != null && StringUtils.hasText(customer.getExclusiveTitle())) {
+            return customer.getExclusiveTitle();
+        }
+        if (form != null && StringUtils.hasText(form.getTitle())) {
+            return form.getTitle();
+        }
+        return "专属餐单";
+    }
+
+    private void backfillExclusiveTitleSection(CustomerMenuForm form, Customer customer) {
+        for (CustomerMenuSectionForm section : form.getSections()) {
+            if ("EXCLUSIVE_TITLE".equals(section.getSectionType()) && !StringUtils.hasText(section.getContent())) {
+                section.setContent(resolveExclusiveTitle(customer, form));
+            }
+        }
+    }
+
+    private String resolveSectionContent(CustomerMenuSectionForm section, Customer customer) {
+        if (section == null) {
+            return null;
+        }
+        if ("EXCLUSIVE_TITLE".equals(section.getSectionType()) && !StringUtils.hasText(section.getContent())) {
+            CustomerMenuForm placeholder = new CustomerMenuForm();
+            placeholder.setTitle(section.getTitle());
+            return resolveExclusiveTitle(customer, placeholder);
+        }
+        return section.getContent();
+    }
+
+    private void syncSectionVisibilityFlags(CustomerMenuForm form) {
+        boolean hasWeeklyTipSection = form.getSections().stream()
+                .anyMatch(section -> "WEEKLY_TIP".equals(section.getSectionType()));
+        boolean hasSwapGuideSection = form.getSections().stream()
+                .anyMatch(section -> "SWAP_GUIDE".equals(section.getSectionType()));
+
+        form.setShowWeeklyTip(hasWeeklyTipSection && !Boolean.FALSE.equals(form.getShowWeeklyTip()));
+        form.setShowSwapGuide(hasSwapGuideSection && !Boolean.FALSE.equals(form.getShowSwapGuide()));
+    }
+
     private void clearSnapshot(Long menuId) {
         List<CustomerMenuSectionContent> sections = sectionContentMapper.selectList(new LambdaQueryWrapper<CustomerMenuSectionContent>()
                 .eq(CustomerMenuSectionContent::getCustomerMenuId, menuId)
@@ -549,12 +584,14 @@ public class CustomerMenuServiceImpl implements CustomerMenuService {
         if (sections == null) {
             return;
         }
+        CustomerMenu menu = customerMenuMapper.selectById(menuId);
+        Customer customer = menu == null || menu.getCustomerId() == null ? null : customerMapper.selectById(menu.getCustomerId());
         for (CustomerMenuSectionForm form : sections) {
             CustomerMenuSectionContent content = new CustomerMenuSectionContent();
             content.setCustomerMenuId(menuId);
             content.setSectionType(form.getSectionType());
             content.setTitle(form.getTitle());
-            content.setContent(form.getContent());
+            content.setContent(resolveSectionContent(form, customer));
             content.setImagePath(form.getImagePath());
             content.setAiImagePrompt(form.getAiImagePrompt());
             content.setSortOrder(form.getSortOrder() == null ? 0 : form.getSortOrder());

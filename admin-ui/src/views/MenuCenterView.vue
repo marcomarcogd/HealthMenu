@@ -82,6 +82,8 @@ const hasSelectedMenus = computed(() => selectedMenuIds.value.length > 0)
 const selectedPublishableIds = computed(() => selectedMenuRows.value
   .filter((item) => canPublish(item))
   .map((item) => item.id))
+const hasWeeklyTipSection = computed(() => menuForm.value.sections.some((section) => section.sectionType === 'WEEKLY_TIP'))
+const hasSwapGuideSection = computed(() => menuForm.value.sections.some((section) => section.sectionType === 'SWAP_GUIDE'))
 const menuSummary = computed(() => {
   const total = pagination.value.total
   const visible = menus.value.length
@@ -1100,10 +1102,10 @@ watch(
           <el-form-item label="主题">
             <el-input :model-value="menuForm.themeName || menuForm.themeCode || '-'" disabled />
           </el-form-item>
-          <el-form-item label="显示每周提示">
+          <el-form-item v-if="hasWeeklyTipSection" label="显示每周提示">
             <el-switch v-model="menuForm.showWeeklyTip" @change="markDirty" />
           </el-form-item>
-          <el-form-item label="显示互换指南">
+          <el-form-item v-if="hasSwapGuideSection" label="显示互换指南">
             <el-switch v-model="menuForm.showSwapGuide" @change="markDirty" />
           </el-form-item>
 
@@ -1217,8 +1219,12 @@ watch(
 
         <div class="preview-block" v-for="(meal, mealIndex) in menuForm.meals" :key="`preview-meal-${mealIndex}`">
           <div class="editor-title">{{ meal.mealName }} {{ meal.mealTime ? `· ${meal.mealTime}` : '' }}</div>
-          <div v-for="(item, itemIndex) in meal.items" :key="`preview-item-${mealIndex}-${itemIndex}`" class="preview-row">
-            <strong>{{ item.itemName }}：</strong>{{ item.itemValue || '-' }}
+          <div
+            v-for="(item, itemIndex) in meal.items.filter((currentItem) => currentItem.itemValue?.trim() || currentItem.imagePath)"
+            :key="`preview-item-${mealIndex}-${itemIndex}`"
+            class="preview-row"
+          >
+            <strong>{{ item.itemName }}：</strong><span v-if="item.itemValue?.trim()">{{ item.itemValue }}</span>
             <el-image
               v-if="item.imagePath"
               :src="item.imagePath"

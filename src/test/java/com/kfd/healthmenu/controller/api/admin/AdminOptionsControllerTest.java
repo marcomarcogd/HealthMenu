@@ -1,5 +1,7 @@
 package com.kfd.healthmenu.controller.api.admin;
 
+import com.kfd.healthmenu.entity.Customer;
+import com.kfd.healthmenu.mapper.CustomerMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -12,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.hasItem;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -23,6 +26,9 @@ class AdminOptionsControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private CustomerMapper customerMapper;
+
     @Test
     void getOptions_shouldReturnCustomersTemplatesAndStatuses() throws Exception {
         mockMvc.perform(get("/api/admin/options"))
@@ -33,5 +39,19 @@ class AdminOptionsControllerTest {
                 .andExpect(jsonPath("$.data.templates").isArray())
                 .andExpect(jsonPath("$.data.recordStatuses[0].value").value("DRAFT"))
                 .andExpect(jsonPath("$.data.recordStatuses[1].value").value("PUBLISHED"));
+    }
+
+    @Test
+    void getOptions_shouldReturnGenderLabelForDictValue() throws Exception {
+        Customer customer = new Customer();
+        customer.setName("字典映射客户");
+        customer.setGender("female");
+        customer.setStatus(1);
+        customerMapper.insert(customer);
+
+        mockMvc.perform(get("/api/admin/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.customers[?(@.gender=='female')].genderLabel").value(hasItem("女")));
     }
 }

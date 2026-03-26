@@ -9,6 +9,7 @@ import com.kfd.healthmenu.dto.api.ApiResponse;
 import com.kfd.healthmenu.dto.api.BooleanOption;
 import com.kfd.healthmenu.dto.api.LabelValueOption;
 import com.kfd.healthmenu.service.CustomerService;
+import com.kfd.healthmenu.service.DictService;
 import com.kfd.healthmenu.service.TemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,7 +18,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/options")
@@ -27,9 +30,11 @@ public class AdminOptionsController {
 
     private final CustomerService customerService;
     private final TemplateService templateService;
+    private final DictService dictService;
 
     @GetMapping
     public ApiResponse<AdminOptionsResponse> getOptions() {
+        Map<String, String> genderLabels = loadDictLabelMap("gender");
         AdminOptionsResponse response = new AdminOptionsResponse();
         response.setSectionTypes(toSectionTypeOptions());
         response.setContentFormats(toContentFormatOptions());
@@ -45,6 +50,7 @@ public class AdminOptionsController {
                     option.setValue(String.valueOf(item.getId()));
                     option.setNickname(item.getNickname());
                     option.setGender(item.getGender());
+                    option.setGenderLabel(resolveDictLabel(genderLabels, item.getGender()));
                     option.setPhone(item.getPhone());
                     option.setExclusiveTitle(item.getExclusiveTitle());
                     option.setNote(item.getNote());
@@ -56,6 +62,44 @@ public class AdminOptionsController {
                 .map(item -> new LabelValueOption(item.getName(), String.valueOf(item.getId())))
                 .toList());
         return ApiResponse.success(response);
+    }
+
+    private Map<String, String> loadDictLabelMap(String typeCode) {
+        Map<String, String> labels = new LinkedHashMap<>();
+        dictService.listTypes().stream()
+                .filter(item -> typeCode.equalsIgnoreCase(item.getTypeCode()))
+                .findFirst()
+                .ifPresent(type -> dictService.listItems(type.getId()).stream()
+                        .filter(item -> item.getStatus() == null || item.getStatus() == 1)
+                        .forEach(item -> {
+                            if (item.getItemValue() != null && item.getItemLabel() != null) {
+                                labels.put(item.getItemValue(), item.getItemLabel());
+                            }
+                            if (item.getItemCode() != null && item.getItemLabel() != null) {
+                                labels.put(item.getItemCode(), item.getItemLabel());
+                            }
+                        }));
+        applyBuiltinFallbackLabels(typeCode, labels);
+        return labels;
+    }
+
+    private String resolveDictLabel(Map<String, String> labels, String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return rawValue;
+        }
+        return labels.getOrDefault(rawValue, rawValue);
+    }
+
+    private void applyBuiltinFallbackLabels(String typeCode, Map<String, String> labels) {
+        if (!"gender".equalsIgnoreCase(typeCode)) {
+            return;
+        }
+        labels.putIfAbsent("female", "女");
+        labels.putIfAbsent("male", "男");
+        labels.putIfAbsent("FEMALE", "女");
+        labels.putIfAbsent("MALE", "男");
+        labels.putIfAbsent("女", "女");
+        labels.putIfAbsent("男", "男");
     }
 
     private List<LabelValueOption> toSectionTypeOptions() {

@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { listDictItems, listDictTypes } from '../api/dict'
 import { getAdminOptions } from '../api/options'
-import { saveCustomer } from '../api/customer'
+import { deleteCustomer, saveCustomer } from '../api/customer'
 
 const customers = ref([])
 const genderOptions = ref([])
@@ -28,6 +28,7 @@ function createEmptyForm() {
 
 const hasCustomers = computed(() => customers.value.length > 0)
 const dialogTitle = computed(() => (form.id ? '编辑客户' : '新建客户'))
+const genderLabelMap = computed(() => new Map(genderOptions.value.map((item) => [item.value, item.label])))
 const filteredCustomers = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
   if (!keyword) {
@@ -78,6 +79,10 @@ function openEditDialog(row) {
     status: row.status ?? 1,
   })
   dialogVisible.value = true
+}
+
+function displayGender(row) {
+  return row.genderLabel || genderLabelMap.value.get(row.gender) || row.gender || '-'
 }
 
 function closeDialog() {
@@ -143,6 +148,30 @@ async function submit() {
   }
 }
 
+async function removeCustomer(row) {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除客户“${row.label || '未命名客户'}”吗？删除前会先检查是否还有关联餐单。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '删除客户',
+        cancelButtonText: '取消',
+      },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await deleteCustomer(row.value)
+    ElMessage.success('客户已删除')
+    await loadCustomers()
+  } catch (error) {
+    ElMessage.error(error?.message || '客户删除失败')
+  }
+}
+
 onMounted(async () => {
   await Promise.all([loadCustomers(), loadGenderOptions()])
 })
@@ -165,7 +194,7 @@ onMounted(async () => {
         <el-table-column prop="label" label="客户名称" min-width="180" />
         <el-table-column prop="nickname" label="昵称" min-width="120" />
         <el-table-column label="性别" width="100">
-          <template #default="{ row }">{{ row.gender || '-' }}</template>
+          <template #default="{ row }">{{ displayGender(row) }}</template>
         </el-table-column>
         <el-table-column prop="phone" label="手机号" min-width="150" />
         <el-table-column prop="exclusiveTitle" label="专属标题" min-width="220" />
@@ -174,9 +203,10 @@ onMounted(async () => {
             <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100">
+        <el-table-column label="操作" width="160">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
+            <el-button link type="danger" @click="removeCustomer(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

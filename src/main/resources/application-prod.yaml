@@ -11,6 +11,21 @@ spring:
       schema-locations: classpath:/sql/schema.sql
       data-locations: classpath:/sql/data.sql
 
+logging:
+  level:
+    root: ERROR
+  file:
+    name: ${APP_LOG_FILE:/opt/healthmenu/logs/healthmenu.log}
+  logback:
+    rollingpolicy:
+      max-file-size: 20MB
+      max-history: 14
+      total-size-cap: 500MB
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
 app:
   frontend-base-url: ${APP_FRONTEND_BASE_URL}
   ai-import:

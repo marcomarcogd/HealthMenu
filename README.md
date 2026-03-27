@@ -74,6 +74,12 @@ $env:APP_SHARE_BASE_URL="http://localhost:8080"
 $env:APP_UPLOAD_DIR="uploads"
 ```
 
+生产环境日志文件可单独指定：
+
+```powershell
+$env:APP_LOG_FILE="/opt/healthmenu/logs/healthmenu.log"
+```
+
 ## Coze / AI 配置
 
 请不要把 Token 提交回仓库，统一通过环境变量注入：
@@ -149,6 +155,28 @@ npm run build
 cd admin-ui
 npm test
 ```
+
+## 生产日志
+
+生产环境默认会把后端日志写到：
+
+- `/opt/healthmenu/logs/healthmenu.log`
+
+日志策略：
+
+- 默认级别：`ERROR`
+- 单文件最大：`20MB`
+- 保留历史：`14` 份
+- 总大小上限：`500MB`
+
+如果你沿用 `systemd` 启动，还需要提前创建日志目录：
+
+```bash
+sudo mkdir -p /opt/healthmenu/logs
+sudo chown -R $(whoami):$(whoami) /opt/healthmenu/logs
+```
+
+如果服务是以专门账号运行，请把上面的属主改成对应运行账号。
 
 ## 默认账号
 

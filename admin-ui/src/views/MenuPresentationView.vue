@@ -40,6 +40,7 @@ const shareMode = computed(() => Boolean(payload.value?.shareMode))
 const fontSizeOptions = PRESENTATION_FONT_SIZE_OPTIONS
 const layoutOptions = PRESENTATION_LAYOUT_OPTIONS
 const currentLayout = computed(() => resolvePresentationLayout(layout.value))
+const currentLayoutCode = computed(() => currentLayout.value.value)
 const title = computed(() => resolvePresentationTitle(menuForm.value || {}))
 const swapGuideSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'SWAP_GUIDE') || null)
 const weeklyTipSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'WEEKLY_TIP') || null)
@@ -427,30 +428,92 @@ onBeforeUnmount(() => {
 
       <div class="presentation-date">{{ menuForm.menuDate || '' }}</div>
 
-      <section v-for="meal in renderedMeals" :key="`${meal.mealCode}-${meal.sortOrder}`" class="presentation-meal">
-        <div class="presentation-meal-side">
-          <div class="presentation-meal-name">{{ meal.mealName }}</div>
-          <div class="presentation-meal-time">{{ meal.mealTime || meal.timeLabel }}</div>
-        </div>
-        <div class="presentation-meal-main">
-          <div v-for="item in meal.items" :key="`${item.itemCode}-${item.sortOrder}`" class="presentation-meal-row">
-            <div class="presentation-meal-label">{{ item.itemName }}：</div>
-            <div class="presentation-meal-value-group">
-              <div
-                class="presentation-meal-value"
-                :style="{ color: item.color || '#2d2d2d', fontWeight: item.bold ? 700 : 400 }"
-              >
-                {{ item.itemValue || '-' }}
+      <section
+        v-for="meal in renderedMeals"
+        :key="`${meal.mealCode}-${meal.sortOrder}`"
+        class="presentation-meal"
+        :class="{
+          'presentation-meal--fresh': currentLayoutCode === 'fresh-card',
+          'presentation-meal--brief': currentLayoutCode === 'brief-pro',
+        }"
+      >
+        <template v-if="currentLayoutCode === 'fresh-card'">
+          <div class="presentation-meal-fresh-header">
+            <div class="presentation-meal-fresh-name">{{ meal.mealName }}</div>
+            <div class="presentation-meal-fresh-time">{{ meal.mealTime || meal.timeLabel }}</div>
+          </div>
+          <div class="presentation-meal-fresh-body">
+            <div v-for="item in meal.items" :key="`${item.itemCode}-${item.sortOrder}`" class="presentation-meal-fresh-row">
+              <div class="presentation-meal-fresh-label">{{ item.itemName }}</div>
+              <div class="presentation-meal-fresh-value-group">
+                <div
+                  class="presentation-meal-fresh-value"
+                  :style="{ color: item.color || '#2d2d2d', fontWeight: item.bold ? 700 : 400 }"
+                >
+                  {{ item.itemValue || '-' }}
+                </div>
+                <img
+                  v-if="item.imagePath"
+                  class="presentation-item-image"
+                  :src="resolveImageUrl(item.imagePath)"
+                  alt="meal item"
+                >
               </div>
-              <img
-                v-if="item.imagePath"
-                class="presentation-item-image"
-                :src="resolveImageUrl(item.imagePath)"
-                alt="meal item"
-              >
             </div>
           </div>
-        </div>
+        </template>
+
+        <template v-else-if="currentLayoutCode === 'brief-pro'">
+          <div class="presentation-meal-brief-header">
+            <div class="presentation-meal-brief-name">{{ meal.mealName }}</div>
+            <div class="presentation-meal-brief-time">{{ meal.mealTime || meal.timeLabel }}</div>
+          </div>
+          <div class="presentation-meal-brief-table">
+            <div v-for="item in meal.items" :key="`${item.itemCode}-${item.sortOrder}`" class="presentation-meal-brief-row">
+              <div class="presentation-meal-brief-label">{{ item.itemName }}</div>
+              <div class="presentation-meal-brief-value-group">
+                <div
+                  class="presentation-meal-brief-value"
+                  :style="{ color: item.color || '#2d2d2d', fontWeight: item.bold ? 700 : 400 }"
+                >
+                  {{ item.itemValue || '-' }}
+                </div>
+                <img
+                  v-if="item.imagePath"
+                  class="presentation-item-image"
+                  :src="resolveImageUrl(item.imagePath)"
+                  alt="meal item"
+                >
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="presentation-meal-side">
+            <div class="presentation-meal-name">{{ meal.mealName }}</div>
+            <div class="presentation-meal-time">{{ meal.mealTime || meal.timeLabel }}</div>
+          </div>
+          <div class="presentation-meal-main">
+            <div v-for="item in meal.items" :key="`${item.itemCode}-${item.sortOrder}`" class="presentation-meal-row">
+              <div class="presentation-meal-label">{{ item.itemName }}：</div>
+              <div class="presentation-meal-value-group">
+                <div
+                  class="presentation-meal-value"
+                  :style="{ color: item.color || '#2d2d2d', fontWeight: item.bold ? 700 : 400 }"
+                >
+                  {{ item.itemValue || '-' }}
+                </div>
+                <img
+                  v-if="item.imagePath"
+                  class="presentation-item-image"
+                  :src="resolveImageUrl(item.imagePath)"
+                  alt="meal item"
+                >
+              </div>
+            </div>
+          </div>
+        </template>
       </section>
     </div>
   </div>
@@ -812,11 +875,13 @@ onBeforeUnmount(() => {
 }
 
 .presentation-page--fresh-card .presentation-meal {
-  padding: 16px;
+  padding: 0;
   margin-bottom: 14px;
   border: 1px solid var(--presentation-section-border);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 10px 24px rgba(74, 111, 89, 0.08);
+  display: block;
+  overflow: hidden;
 }
 
 .presentation-page--brief-pro .presentation-card {
@@ -846,14 +911,12 @@ onBeforeUnmount(() => {
   margin-bottom: 24px;
 }
 
-.presentation-page--brief-pro .presentation-section-title,
-.presentation-page--brief-pro .presentation-date {
+.presentation-page--brief-pro .presentation-section-title {
   align-items: flex-start;
   text-align: left;
 }
 
-.presentation-page--brief-pro .presentation-section-title::after,
-.presentation-page--brief-pro .presentation-date::after {
+.presentation-page--brief-pro .presentation-section-title::after {
   margin-left: 0;
 }
 
@@ -862,17 +925,129 @@ onBeforeUnmount(() => {
   text-align: right;
 }
 
+.presentation-page--brief-pro .presentation-date::after {
+  margin-right: 0;
+  margin-left: auto;
+}
+
 .presentation-page--brief-pro .presentation-meal {
-  padding: 14px 16px;
+  padding: 0;
   margin-bottom: 12px;
   border: 1px solid var(--presentation-section-border);
   background: #fafbfa;
   box-shadow: none;
+  display: block;
+  overflow: hidden;
 }
 
 .presentation-page--brief-pro .presentation-meal-side {
   box-shadow: none;
   border: 1px solid var(--presentation-section-border);
+}
+
+.presentation-meal-fresh-header,
+.presentation-meal-brief-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.presentation-meal-fresh-name,
+.presentation-meal-brief-name {
+  font-size: var(--presentation-meal-name-size);
+  font-weight: 500;
+}
+
+.presentation-meal-fresh-time,
+.presentation-meal-brief-time {
+  font-size: calc(var(--presentation-meal-time-size) + 1px);
+  line-height: 1.4;
+  text-align: right;
+  word-break: break-word;
+}
+
+.presentation-page--fresh-card .presentation-meal-fresh-header {
+  padding: 14px 18px;
+  background: linear-gradient(135deg, rgba(231, 245, 235, 0.95) 0%, rgba(214, 235, 220, 0.95) 100%);
+  color: #2f6a4c;
+  border-bottom: 1px solid var(--presentation-section-border);
+}
+
+.presentation-page--fresh-card .presentation-meal-fresh-time {
+  color: #486a56;
+}
+
+.presentation-meal-fresh-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px 18px;
+}
+
+.presentation-meal-fresh-row {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(247, 252, 248, 1) 0%, rgba(240, 248, 242, 1) 100%);
+  border: 1px solid rgba(220, 233, 223, 0.95);
+}
+
+.presentation-meal-fresh-label {
+  font-size: calc(var(--presentation-meal-label-size) - 2px);
+  color: #55705f;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.presentation-meal-fresh-value-group,
+.presentation-meal-brief-value-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.presentation-meal-fresh-value,
+.presentation-meal-brief-value {
+  font-size: var(--presentation-meal-main-size);
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.presentation-page--brief-pro .presentation-meal-brief-header {
+  padding: 14px 16px;
+  background: #eef2ef;
+  color: #1f4739;
+  border-bottom: 1px solid var(--presentation-section-border);
+}
+
+.presentation-page--brief-pro .presentation-meal-brief-time {
+  color: #54655d;
+}
+
+.presentation-meal-brief-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.presentation-meal-brief-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(213, 219, 212, 0.95);
+}
+
+.presentation-meal-brief-row:last-child {
+  border-bottom: none;
+}
+
+.presentation-meal-brief-label {
+  font-size: calc(var(--presentation-meal-label-size) - 2px);
+  color: #4f5f56;
+  font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 @media (max-width: 900px) {
@@ -946,14 +1121,34 @@ onBeforeUnmount(() => {
     line-height: 1.45;
   }
 
-  .presentation-page--fresh-card .presentation-section,
-  .presentation-page--fresh-card .presentation-meal,
-  .presentation-page--brief-pro .presentation-meal {
+  .presentation-page--fresh-card .presentation-section {
     padding: 14px 12px;
   }
 
   .presentation-page--brief-pro .presentation-section {
     padding-left: 12px;
+  }
+
+  .presentation-page--fresh-card .presentation-meal,
+  .presentation-page--brief-pro .presentation-meal {
+    padding: 0;
+  }
+
+  .presentation-page--fresh-card .presentation-meal-fresh-header,
+  .presentation-page--fresh-card .presentation-meal-fresh-body,
+  .presentation-page--brief-pro .presentation-meal-brief-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .presentation-meal-brief-row {
+    grid-template-columns: 74px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .presentation-meal-fresh-row {
+    padding: 10px 12px;
   }
 }
 </style>

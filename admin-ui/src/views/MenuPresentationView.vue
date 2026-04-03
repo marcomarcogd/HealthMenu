@@ -889,18 +889,20 @@ onBeforeUnmount(() => {
 }
 
 .presentation-page--brief-pro .presentation-header {
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
 .presentation-page--brief-pro .presentation-logo {
   width: 92px;
-  align-self: flex-end;
+  align-self: auto;
 }
 
 .presentation-page--brief-pro .presentation-title {
-  width: 100%;
+  width: auto;
+  flex: 1;
   text-align: left;
   letter-spacing: 0.2px;
 }
@@ -921,13 +923,13 @@ onBeforeUnmount(() => {
 }
 
 .presentation-page--brief-pro .presentation-date {
-  align-items: flex-end;
-  text-align: right;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .presentation-page--brief-pro .presentation-date::after {
-  margin-right: 0;
-  margin-left: auto;
+  margin-left: 0;
+  margin-right: auto;
 }
 
 .presentation-page--brief-pro .presentation-meal {

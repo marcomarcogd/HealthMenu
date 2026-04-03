@@ -6,6 +6,11 @@ import {
   resolvePresentationTitle,
   resolveSectionTitle,
 } from './menu-presentation'
+import {
+  DEFAULT_PRESENTATION_LAYOUT,
+  normalizePresentationLayout,
+  resolvePresentationLayout,
+} from './menu-presentation-templates'
 
 describe('menu-presentation utils', () => {
   it('prefers exclusive title content for the page title', () => {
@@ -38,6 +43,19 @@ describe('menu-presentation utils', () => {
     expect(buildPresentationFontVars('xlarge')).toMatchObject({
       '--presentation-title-size': '28px',
       '--presentation-meal-main-size': '24px',
+    })
+  })
+
+  it('normalizes invalid presentation layouts to classic', () => {
+    expect(normalizePresentationLayout('fresh-card')).toBe('fresh-card')
+    expect(normalizePresentationLayout('poster')).toBe(DEFAULT_PRESENTATION_LAYOUT)
+  })
+
+  it('resolves presentation layout config metadata', () => {
+    expect(resolvePresentationLayout('brief-pro')).toMatchObject({
+      value: 'brief-pro',
+      label: '专业简报版',
+      className: 'presentation-page--brief-pro',
     })
   })
 })

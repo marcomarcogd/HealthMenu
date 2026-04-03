@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getPublicMenuById, getPublicMenuByToken } from '../api/public-menu'
+import { copyText } from '../utils/clipboard'
 import {
   buildPresentationFontVars,
   DEFAULT_PRESENTATION_FONT_SIZE,
@@ -11,8 +12,15 @@ import {
   resolvePresentationTitle,
   resolveSectionTitle,
 } from '../utils/menu-presentation'
+import {
+  DEFAULT_PRESENTATION_LAYOUT,
+  normalizePresentationLayout,
+  PRESENTATION_LAYOUT_OPTIONS,
+  resolvePresentationLayout,
+} from '../utils/menu-presentation-templates'
 
 const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const errorMessage = ref('')
 const payload = ref(null)
@@ -20,7 +28,9 @@ const pageRef = ref(null)
 const cardRef = ref(null)
 const logoSrc = `${import.meta.env.BASE_URL}logo.png`
 const fontSize = ref(DEFAULT_PRESENTATION_FONT_SIZE)
+const layout = ref(DEFAULT_PRESENTATION_LAYOUT)
 const fontSizeStorageKey = 'healthmenu-presentation-font-size'
+const layoutStorageKey = 'healthmenu-presentation-layout'
 
 let html2canvasLoader = null
 
@@ -28,12 +38,18 @@ const menuForm = computed(() => payload.value?.menuForm || null)
 const meals = computed(() => menuForm.value?.meals || [])
 const shareMode = computed(() => Boolean(payload.value?.shareMode))
 const fontSizeOptions = PRESENTATION_FONT_SIZE_OPTIONS
+const layoutOptions = PRESENTATION_LAYOUT_OPTIONS
+const currentLayout = computed(() => resolvePresentationLayout(layout.value))
 const title = computed(() => resolvePresentationTitle(menuForm.value || {}))
 const swapGuideSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'SWAP_GUIDE') || null)
 const weeklyTipSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'WEEKLY_TIP') || null)
 const swapGuideTitle = computed(() => resolveSectionTitle(swapGuideSection.value, '核心食物互换速查指南'))
 const weeklyTipTitle = computed(() => resolveSectionTitle(weeklyTipSection.value, '每周提示'))
-const presentationStyleVars = computed(() => buildPresentationFontVars(fontSize.value))
+const presentationStyleVars = computed(() => ({
+  ...buildPresentationFontVars(fontSize.value),
+  ...currentLayout.value.cssVars,
+}))
+const presentationPageClasses = computed(() => ['presentation-page', currentLayout.value.className])
 const extraSections = computed(() => (menuForm.value?.sections || []).filter((section) => !['SWAP_GUIDE', 'WEEKLY_TIP', 'EXCLUSIVE_TITLE', 'DAILY_MENU'].includes(section.sectionType)))
 const renderedMeals = computed(() => meals.value
   .map((meal) => ({
@@ -74,6 +90,80 @@ function setFontSize(value) {
   } catch {
     // Ignore local storage failures in private mode or restricted browsers.
   }
+}
+
+function readStoredLayout() {
+  try {
+    return normalizePresentationLayout(window.localStorage.getItem(layoutStorageKey))
+  } catch {
+    return DEFAULT_PRESENTATION_LAYOUT
+  }
+}
+
+function setLayoutState(value, { persist = true } = {}) {
+  const normalized = normalizePresentationLayout(value)
+  layout.value = normalized
+  if (persist) {
+    try {
+      window.localStorage.setItem(layoutStorageKey, normalized)
+    } catch {
+      // Ignore local storage failures in private mode or restricted browsers.
+    }
+  }
+  return normalized
+}
+
+function resolveRouteLayout(rawLayout) {
+  if (Array.isArray(rawLayout)) {
+    return rawLayout[0] || ''
+  }
+  return typeof rawLayout === 'string' ? rawLayout : ''
+}
+
+async function replaceRouteLayout(value) {
+  const normalized = normalizePresentationLayout(value)
+  const currentQueryLayout = resolveRouteLayout(route.query.layout)
+  if (currentQueryLayout === normalized) {
+    return
+  }
+
+  await router.replace({
+    query: {
+      ...route.query,
+      layout: normalized,
+    },
+  })
+}
+
+function setLayout(value) {
+  const normalized = setLayoutState(value)
+  replaceRouteLayout(normalized).catch(() => {
+    ElMessage.error('样式切换失败，请稍后重试')
+  })
+}
+
+async function copyCurrentLayoutLink() {
+  try {
+    const url = new URL(window.location.href)
+    url.searchParams.set('layout', layout.value)
+    await copyText(url.toString())
+    ElMessage.success('当前样式链接已复制')
+  } catch (error) {
+    ElMessage.error(error?.message || '复制链接失败')
+  }
+}
+
+async function syncLayoutFromRoute(rawLayout) {
+  const queryLayout = resolveRouteLayout(rawLayout)
+  if (queryLayout) {
+    const normalized = setLayoutState(queryLayout)
+    if (queryLayout !== normalized) {
+      await replaceRouteLayout(normalized)
+    }
+    return
+  }
+
+  setLayoutState(readStoredLayout())
 }
 
 async function ensureHtml2Canvas() {
@@ -156,7 +246,6 @@ async function exportImage() {
 
     pageClone.style.minHeight = 'auto'
     pageClone.style.padding = '0'
-    pageClone.style.background = 'transparent'
     pageClone.style.width = `${Math.ceil(sourceRect.width)}px`
 
     const clone = pageClone.querySelector('.presentation-card')
@@ -224,7 +313,8 @@ function resolveImageUrl(path) {
   return new URL(path, window.location.origin).toString()
 }
 
-watch(() => route.fullPath, loadMenu, { immediate: true })
+watch(() => [route.params.id, route.params.token], loadMenu, { immediate: true })
+watch(() => route.query.layout, syncLayoutFromRoute, { immediate: true })
 
 onMounted(() => {
   try {
@@ -241,8 +331,23 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="pageRef" class="presentation-page" :style="presentationStyleVars" v-loading="loading">
+  <div ref="pageRef" :class="presentationPageClasses" :style="presentationStyleVars" v-loading="loading">
     <div class="presentation-toolbar" :class="{ 'presentation-toolbar--share': shareMode }">
+      <div class="presentation-layout-controls">
+        <span class="presentation-font-label">模板</span>
+        <button
+          v-for="option in layoutOptions"
+          :key="option.value"
+          type="button"
+          class="presentation-layout-btn"
+          :class="{ 'presentation-layout-btn--active': layout === option.value }"
+          @click="setLayout(option.value)"
+        >
+          {{ option.label }}
+        </button>
+        <span class="presentation-layout-hint">{{ currentLayout.description }}</span>
+      </div>
+
       <div class="presentation-font-controls">
         <span class="presentation-font-label">字号</span>
         <button
@@ -256,6 +361,7 @@ onBeforeUnmount(() => {
           {{ option.label }}
         </button>
       </div>
+      <button class="presentation-btn presentation-btn--secondary" @click="copyCurrentLayoutLink">复制当前样式链接</button>
       <button class="presentation-btn presentation-btn--secondary" @click="printPage">打印</button>
       <button class="presentation-btn presentation-btn--primary" @click="exportImage">导出图片</button>
     </div>
@@ -368,7 +474,7 @@ onBeforeUnmount(() => {
 
 .presentation-page {
   min-height: 100vh;
-  background: #faf7f2;
+  background: var(--presentation-page-bg);
   padding: 24px 16px 48px;
   --presentation-title-size: 24px;
   --presentation-section-title-size: 24px;
@@ -394,7 +500,7 @@ onBeforeUnmount(() => {
   top: 0;
   z-index: 10;
   padding-top: 8px;
-  background: rgba(250, 247, 242, 0.94);
+  background: var(--presentation-toolbar-bg);
   backdrop-filter: blur(8px);
 }
 
@@ -407,59 +513,68 @@ onBeforeUnmount(() => {
 }
 
 .presentation-btn--primary {
-  background: #2a5c45;
+  background: var(--presentation-accent);
   color: #fff;
 }
 
 .presentation-btn--secondary {
-  background: #eef3ee;
-  color: #2a5c45;
+  background: var(--presentation-accent-soft);
+  color: var(--presentation-accent);
 }
 
+.presentation-layout-controls,
 .presentation-font-controls {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid #e8e5e0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--presentation-toolbar-border);
+}
+
+.presentation-layout-hint {
+  font-size: 12px;
+  color: var(--presentation-muted-text);
+  margin-left: 4px;
 }
 
 .presentation-font-label {
   font-size: 13px;
-  color: #516257;
+  color: var(--presentation-muted-text);
 }
 
+.presentation-layout-btn,
 .presentation-font-btn {
-  border: 1px solid #d6dfd8;
+  border: 1px solid var(--presentation-toolbar-border);
   border-radius: 999px;
   background: #fff;
-  color: #2a5c45;
+  color: var(--presentation-accent);
   padding: 5px 10px;
   cursor: pointer;
   font-size: 13px;
   line-height: 1;
 }
 
+.presentation-layout-btn--active,
 .presentation-font-btn--active {
-  background: #2a5c45;
-  border-color: #2a5c45;
+  background: var(--presentation-accent);
+  border-color: var(--presentation-accent);
   color: #fff;
 }
 
 .presentation-card {
   width: 100%;
-  max-width: 560px;
+  max-width: var(--presentation-card-max-width);
   margin: 0 auto;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+  background: var(--presentation-card-bg);
+  border-radius: var(--presentation-card-radius);
+  box-shadow: var(--presentation-card-shadow);
   padding: 40px 30px 32px;
   position: relative;
   overflow: hidden;
-  border: 1px solid #e8e5e0;
+  border: 1px solid var(--presentation-card-border);
   background-image: linear-gradient(0deg, rgba(248, 246, 243, 0.02) 1px, transparent 1px);
   background-size: 100% 24px;
 }
@@ -467,11 +582,11 @@ onBeforeUnmount(() => {
 .presentation-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: var(--presentation-header-align);
   gap: 20px;
   margin-bottom: 24px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e8e5e0;
+  border-bottom: 1px solid var(--presentation-divider-color);
 }
 
 .presentation-logo {
@@ -487,7 +602,7 @@ onBeforeUnmount(() => {
   text-align: right;
   font-size: var(--presentation-title-size);
   font-weight: 500;
-  color: #2a5c45;
+  color: var(--presentation-accent);
   letter-spacing: 0.5px;
 }
 
@@ -499,10 +614,10 @@ onBeforeUnmount(() => {
 .presentation-date {
   font-size: var(--presentation-section-title-size);
   font-weight: 500;
-  color: #2a5c45;
+  color: var(--presentation-accent);
   text-align: center;
   padding-bottom: 10px;
-  border-bottom: 1px solid #e8e5e0;
+  border-bottom: 1px solid var(--presentation-divider-color);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -515,7 +630,7 @@ onBeforeUnmount(() => {
   content: '';
   width: 52px;
   height: 2px;
-  background: #2a5c45;
+  background: var(--presentation-accent);
   display: block;
   margin: 6px auto 0;
   border-radius: 1px;
@@ -525,9 +640,9 @@ onBeforeUnmount(() => {
   font-size: var(--presentation-content-size);
   line-height: 1.85;
   padding: 16px 18px;
-  background: #f8f6f3;
-  border-radius: 4px;
-  border: 1px solid #e8e5e0;
+  background: var(--presentation-section-bg);
+  border-radius: var(--presentation-section-radius);
+  border: 1px solid var(--presentation-section-border);
   white-space: pre-wrap;
 }
 
@@ -538,22 +653,23 @@ onBeforeUnmount(() => {
   max-width: 320px;
   margin-top: 14px;
   border-radius: 8px;
-  border: 1px solid #e8e5e0;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--presentation-section-border);
+  box-shadow: var(--presentation-image-shadow);
 }
 
 .presentation-date {
   font-size: var(--presentation-date-size);
-  color: #2d2d2d;
+  color: var(--presentation-text-color);
 }
 
 .presentation-meal {
   margin-bottom: 10px;
   padding: 10px 8px;
-  border-bottom: 1px solid #e8e5e0;
+  border-bottom: 1px solid var(--presentation-divider-color);
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  border-radius: var(--presentation-meal-radius);
 }
 
 .presentation-meal:last-child {
@@ -568,11 +684,11 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #2a5c45;
-  color: #fff;
+  background: var(--presentation-meal-side-bg);
+  color: var(--presentation-meal-side-color);
   padding: 10px 8px;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(42, 92, 69, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(42, 92, 69, 0.08);
 }
 
 .presentation-meal-name {
@@ -583,7 +699,7 @@ onBeforeUnmount(() => {
 
 .presentation-meal-time {
   font-size: var(--presentation-meal-time-size);
-  color: #e6f0ea;
+  color: var(--presentation-meal-side-subtle);
   line-height: 1.3;
   margin-top: 4px;
   max-width: 78px;
@@ -595,7 +711,7 @@ onBeforeUnmount(() => {
   flex: 1;
   font-size: var(--presentation-meal-main-size);
   line-height: 1.55;
-  color: #333;
+  color: var(--presentation-text-color);
 }
 
 .presentation-meal-row {
@@ -604,15 +720,17 @@ onBeforeUnmount(() => {
   gap: 8px;
   margin-bottom: 4px;
   padding: 2px 0;
+  border-bottom: 1px solid var(--presentation-meal-row-divider);
 }
 
 .presentation-meal-row:last-child {
   margin-bottom: 0;
+  border-bottom: none;
 }
 
 .presentation-meal-label {
   min-width: 64px;
-  color: #666;
+  color: var(--presentation-label-color);
   font-size: var(--presentation-meal-label-size);
   flex-shrink: 0;
 }
@@ -643,13 +761,131 @@ onBeforeUnmount(() => {
 .presentation-empty h1 {
   margin: 0 0 12px;
   font-size: 28px;
-  color: #2a5c45;
+  color: var(--presentation-accent);
 }
 
 .presentation-empty p {
   margin: 0;
   color: #667085;
   line-height: 1.7;
+}
+
+.presentation-page--fresh-card .presentation-header {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.presentation-page--fresh-card .presentation-title {
+  text-align: center;
+}
+
+.presentation-page--fresh-card .presentation-section {
+  padding: 18px 18px 20px;
+  border-radius: 20px;
+  border: 1px solid var(--presentation-section-border);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 26px rgba(74, 111, 89, 0.08);
+}
+
+.presentation-page--fresh-card .presentation-section-title {
+  margin-bottom: 14px;
+}
+
+.presentation-page--fresh-card .presentation-content {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.presentation-page--fresh-card .presentation-date {
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--presentation-section-border);
+  border-radius: 999px;
+}
+
+.presentation-page--fresh-card .presentation-date::after {
+  display: none;
+}
+
+.presentation-page--fresh-card .presentation-meal {
+  padding: 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--presentation-section-border);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(74, 111, 89, 0.08);
+}
+
+.presentation-page--brief-pro .presentation-card {
+  background-image: none;
+}
+
+.presentation-page--brief-pro .presentation-header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.presentation-page--brief-pro .presentation-logo {
+  width: 92px;
+  align-self: flex-end;
+}
+
+.presentation-page--brief-pro .presentation-title {
+  width: 100%;
+  text-align: left;
+  letter-spacing: 0.2px;
+}
+
+.presentation-page--brief-pro .presentation-section {
+  padding-left: 16px;
+  border-left: 4px solid var(--presentation-accent);
+  margin-bottom: 24px;
+}
+
+.presentation-page--brief-pro .presentation-section-title,
+.presentation-page--brief-pro .presentation-date {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.presentation-page--brief-pro .presentation-section-title::after,
+.presentation-page--brief-pro .presentation-date::after {
+  margin-left: 0;
+}
+
+.presentation-page--brief-pro .presentation-date {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.presentation-page--brief-pro .presentation-meal {
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--presentation-section-border);
+  background: #fafbfa;
+  box-shadow: none;
+}
+
+.presentation-page--brief-pro .presentation-meal-side {
+  box-shadow: none;
+  border: 1px solid var(--presentation-section-border);
+}
+
+@media (max-width: 900px) {
+  .presentation-layout-controls {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .presentation-layout-hint {
+    width: 100%;
+    text-align: center;
+    margin-left: 0;
+  }
 }
 
 @media (max-width: 768px) {
@@ -674,7 +910,8 @@ onBeforeUnmount(() => {
     gap: 10px;
   }
 
-  .presentation-font-controls {
+  .presentation-font-controls,
+  .presentation-layout-controls {
     width: 100%;
     justify-content: center;
   }
@@ -707,6 +944,16 @@ onBeforeUnmount(() => {
   .presentation-meal-main,
   .presentation-meal-label {
     line-height: 1.45;
+  }
+
+  .presentation-page--fresh-card .presentation-section,
+  .presentation-page--fresh-card .presentation-meal,
+  .presentation-page--brief-pro .presentation-meal {
+    padding: 14px 12px;
+  }
+
+  .presentation-page--brief-pro .presentation-section {
+    padding-left: 12px;
   }
 }
 </style>

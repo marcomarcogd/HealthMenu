@@ -25,8 +25,8 @@ describe('menu-form utils', () => {
     expect(result.meals[0].items[0].sortOrder).toBe(1)
   })
 
-  it('normalizes save payload ids to numbers', () => {
-    expect(normalizeMenuSavePayload({ customerId: '12', templateId: '34' })).toEqual({ customerId: 12, templateId: 34 })
+  it('preserves save payload ids as strings', () => {
+    expect(normalizeMenuSavePayload({ customerId: '12', templateId: '34' })).toEqual({ customerId: '12', templateId: '34' })
   })
 
   it('builds ai preview summary', () => {

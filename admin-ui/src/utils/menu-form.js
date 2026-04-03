@@ -87,8 +87,8 @@ export function createEmptyMenuSelector() {
 export function normalizeMenuSavePayload(payload) {
   return {
     ...payload,
-    customerId: payload.customerId ? Number(payload.customerId) : null,
-    templateId: payload.templateId ? Number(payload.templateId) : null,
+    customerId: payload.customerId ? String(payload.customerId) : null,
+    templateId: payload.templateId ? String(payload.templateId) : null,
   }
 }
 

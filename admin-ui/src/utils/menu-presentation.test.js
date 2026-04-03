@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePresentationTitle, resolveSectionTitle } from './menu-presentation'
+import {
+  buildPresentationFontVars,
+  DEFAULT_PRESENTATION_FONT_SIZE,
+  normalizePresentationFontSize,
+  resolvePresentationTitle,
+  resolveSectionTitle,
+} from './menu-presentation'
 
 describe('menu-presentation utils', () => {
   it('prefers exclusive title content for the page title', () => {
@@ -17,5 +23,21 @@ describe('menu-presentation utils', () => {
   it('prefers template section title over hard-coded defaults', () => {
     expect(resolveSectionTitle({ title: '本周执行重点' }, '每周提示')).toBe('本周执行重点')
     expect(resolveSectionTitle({ title: ' ' }, '每周提示')).toBe('每周提示')
+  })
+
+  it('normalizes invalid font size values to medium', () => {
+    expect(normalizePresentationFontSize('large')).toBe('large')
+    expect(normalizePresentationFontSize('huge')).toBe(DEFAULT_PRESENTATION_FONT_SIZE)
+  })
+
+  it('builds font variables for the selected size', () => {
+    expect(buildPresentationFontVars('small')).toMatchObject({
+      '--presentation-title-size': '22px',
+      '--presentation-meal-main-size': '18px',
+    })
+    expect(buildPresentationFontVars('xlarge')).toMatchObject({
+      '--presentation-title-size': '28px',
+      '--presentation-meal-main-size': '24px',
+    })
   })
 })

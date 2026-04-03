@@ -3,7 +3,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getPublicMenuById, getPublicMenuByToken } from '../api/public-menu'
-import { resolvePresentationTitle, resolveSectionTitle } from '../utils/menu-presentation'
+import {
+  buildPresentationFontVars,
+  DEFAULT_PRESENTATION_FONT_SIZE,
+  normalizePresentationFontSize,
+  PRESENTATION_FONT_SIZE_OPTIONS,
+  resolvePresentationTitle,
+  resolveSectionTitle,
+} from '../utils/menu-presentation'
 
 const route = useRoute()
 const loading = ref(false)
@@ -12,17 +19,21 @@ const payload = ref(null)
 const pageRef = ref(null)
 const cardRef = ref(null)
 const logoSrc = `${import.meta.env.BASE_URL}logo.png`
+const fontSize = ref(DEFAULT_PRESENTATION_FONT_SIZE)
+const fontSizeStorageKey = 'healthmenu-presentation-font-size'
 
 let html2canvasLoader = null
 
 const menuForm = computed(() => payload.value?.menuForm || null)
 const meals = computed(() => menuForm.value?.meals || [])
 const shareMode = computed(() => Boolean(payload.value?.shareMode))
+const fontSizeOptions = PRESENTATION_FONT_SIZE_OPTIONS
 const title = computed(() => resolvePresentationTitle(menuForm.value || {}))
 const swapGuideSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'SWAP_GUIDE') || null)
 const weeklyTipSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'WEEKLY_TIP') || null)
 const swapGuideTitle = computed(() => resolveSectionTitle(swapGuideSection.value, '核心食物互换速查指南'))
 const weeklyTipTitle = computed(() => resolveSectionTitle(weeklyTipSection.value, '每周提示'))
+const presentationStyleVars = computed(() => buildPresentationFontVars(fontSize.value))
 const extraSections = computed(() => (menuForm.value?.sections || []).filter((section) => !['SWAP_GUIDE', 'WEEKLY_TIP', 'EXCLUSIVE_TITLE', 'DAILY_MENU'].includes(section.sectionType)))
 const renderedMeals = computed(() => meals.value
   .map((meal) => ({
@@ -53,6 +64,16 @@ async function loadMenu() {
 
 function printPage() {
   window.print()
+}
+
+function setFontSize(value) {
+  const normalized = normalizePresentationFontSize(value)
+  fontSize.value = normalized
+  try {
+    window.localStorage.setItem(fontSizeStorageKey, normalized)
+  } catch {
+    // Ignore local storage failures in private mode or restricted browsers.
+  }
 }
 
 async function ensureHtml2Canvas() {
@@ -152,8 +173,16 @@ async function exportImage() {
 
     await waitForPresentationAssets(pageClone)
     const exportRect = clone.getBoundingClientRect()
-    const exportViewportWidth = Math.ceil(exportRect.width)
-    const exportViewportHeight = Math.ceil(exportRect.height)
+    const exportViewportWidth = Math.max(
+      window.innerWidth || 0,
+      document.documentElement?.clientWidth || 0,
+      Math.ceil(exportRect.width),
+    )
+    const exportViewportHeight = Math.max(
+      window.innerHeight || 0,
+      document.documentElement?.clientHeight || 0,
+      Math.ceil(exportRect.height),
+    )
     const canvas = await html2canvas(clone, {
       scale: Math.max(2, Math.min(window.devicePixelRatio || 2, 3)),
       useCORS: true,
@@ -198,6 +227,11 @@ function resolveImageUrl(path) {
 watch(() => route.fullPath, loadMenu, { immediate: true })
 
 onMounted(() => {
+  try {
+    fontSize.value = normalizePresentationFontSize(window.localStorage.getItem(fontSizeStorageKey))
+  } catch {
+    fontSize.value = DEFAULT_PRESENTATION_FONT_SIZE
+  }
   document.body.classList.add('menu-presentation-body')
 })
 
@@ -207,8 +241,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="pageRef" class="presentation-page" v-loading="loading">
+  <div ref="pageRef" class="presentation-page" :style="presentationStyleVars" v-loading="loading">
     <div class="presentation-toolbar" :class="{ 'presentation-toolbar--share': shareMode }">
+      <div class="presentation-font-controls">
+        <span class="presentation-font-label">字号</span>
+        <button
+          v-for="option in fontSizeOptions"
+          :key="option.value"
+          type="button"
+          class="presentation-font-btn"
+          :class="{ 'presentation-font-btn--active': fontSize === option.value }"
+          @click="setFontSize(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
       <button class="presentation-btn presentation-btn--secondary" @click="printPage">打印</button>
       <button class="presentation-btn presentation-btn--primary" @click="exportImage">导出图片</button>
     </div>
@@ -323,11 +370,21 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   background: #faf7f2;
   padding: 24px 16px 48px;
+  --presentation-title-size: 24px;
+  --presentation-section-title-size: 24px;
+  --presentation-date-size: 22px;
+  --presentation-content-size: 20px;
+  --presentation-meal-name-size: 20px;
+  --presentation-meal-time-size: 12px;
+  --presentation-meal-main-size: 20px;
+  --presentation-meal-label-size: 20px;
 }
 
 .presentation-toolbar {
   display: flex;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -357,6 +414,39 @@ onBeforeUnmount(() => {
 .presentation-btn--secondary {
   background: #eef3ee;
   color: #2a5c45;
+}
+
+.presentation-font-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #e8e5e0;
+}
+
+.presentation-font-label {
+  font-size: 13px;
+  color: #516257;
+}
+
+.presentation-font-btn {
+  border: 1px solid #d6dfd8;
+  border-radius: 999px;
+  background: #fff;
+  color: #2a5c45;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.presentation-font-btn--active {
+  background: #2a5c45;
+  border-color: #2a5c45;
+  color: #fff;
 }
 
 .presentation-card {
@@ -395,7 +485,7 @@ onBeforeUnmount(() => {
 .presentation-title {
   flex: 1;
   text-align: right;
-  font-size: 24px;
+  font-size: var(--presentation-title-size);
   font-weight: 500;
   color: #2a5c45;
   letter-spacing: 0.5px;
@@ -407,7 +497,7 @@ onBeforeUnmount(() => {
 
 .presentation-section-title,
 .presentation-date {
-  font-size: 24px;
+  font-size: var(--presentation-section-title-size);
   font-weight: 500;
   color: #2a5c45;
   text-align: center;
@@ -432,7 +522,7 @@ onBeforeUnmount(() => {
 }
 
 .presentation-content {
-  font-size: 20px;
+  font-size: var(--presentation-content-size);
   line-height: 1.85;
   padding: 16px 18px;
   background: #f8f6f3;
@@ -453,17 +543,17 @@ onBeforeUnmount(() => {
 }
 
 .presentation-date {
-  font-size: 22px;
+  font-size: var(--presentation-date-size);
   color: #2d2d2d;
 }
 
 .presentation-meal {
-  margin-bottom: 16px;
-  padding: 14px 12px;
+  margin-bottom: 10px;
+  padding: 10px 8px;
   border-bottom: 1px solid #e8e5e0;
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 12px;
 }
 
 .presentation-meal:last-child {
@@ -473,47 +563,47 @@ onBeforeUnmount(() => {
 }
 
 .presentation-meal-side {
-  width: 100px;
+  width: 92px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   background: #2a5c45;
   color: #fff;
-  padding: 12px 8px;
+  padding: 10px 8px;
   border-radius: 4px;
   box-shadow: 0 1px 3px rgba(42, 92, 69, 0.1);
 }
 
 .presentation-meal-name {
-  font-size: 20px;
+  font-size: var(--presentation-meal-name-size);
   font-weight: 500;
   line-height: 1.2;
 }
 
 .presentation-meal-time {
-  font-size: 12px;
+  font-size: var(--presentation-meal-time-size);
   color: #e6f0ea;
-  line-height: 1.35;
-  margin-top: 6px;
-  max-width: 85px;
+  line-height: 1.3;
+  margin-top: 4px;
+  max-width: 78px;
   text-align: center;
   word-break: break-word;
 }
 
 .presentation-meal-main {
   flex: 1;
-  font-size: 20px;
-  line-height: 1.8;
+  font-size: var(--presentation-meal-main-size);
+  line-height: 1.55;
   color: #333;
 }
 
 .presentation-meal-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 8px;
-  padding: 4px 0;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 2px 0;
 }
 
 .presentation-meal-row:last-child {
@@ -521,9 +611,9 @@ onBeforeUnmount(() => {
 }
 
 .presentation-meal-label {
-  min-width: 72px;
+  min-width: 64px;
   color: #666;
-  font-size: 20px;
+  font-size: var(--presentation-meal-label-size);
   flex-shrink: 0;
 }
 
@@ -531,7 +621,7 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .presentation-meal-value {
@@ -580,20 +670,43 @@ onBeforeUnmount(() => {
     width: 92px;
   }
 
+  .presentation-toolbar {
+    gap: 10px;
+  }
+
+  .presentation-font-controls {
+    width: 100%;
+    justify-content: center;
+  }
+
   .presentation-meal {
-    flex-direction: column;
+    gap: 10px;
+    padding: 8px 4px;
+  }
+
+  .presentation-meal-side {
+    width: 78px;
+    padding: 8px 6px;
+  }
+
+  .presentation-meal-time {
+    max-width: 66px;
+  }
+
+  .presentation-meal-label {
+    min-width: 56px;
   }
 
   .presentation-section-title,
   .presentation-date,
   .presentation-title {
-    font-size: 22px;
+    letter-spacing: 0.2px;
   }
 
   .presentation-content,
   .presentation-meal-main,
   .presentation-meal-label {
-    font-size: 18px;
+    line-height: 1.45;
   }
 }
 </style>

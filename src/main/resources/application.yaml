@@ -3,12 +3,6 @@ spring:
     name: HealthMenu
   profiles:
     default: local
-  thymeleaf:
-    cache: false
-    prefix: classpath:/templates/
-    suffix: .html
-    mode: HTML
-    encoding: UTF-8
   web:
     resources:
       static-locations: classpath:/static/,classpath:/public/,file:uploads/

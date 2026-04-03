@@ -2,7 +2,7 @@
 
 `HealthMenu` 是一个面向营养师/健管师的餐单管理项目，当前已经拆分为后端服务和独立后台前端两部分：
 
-- `src/`：Spring Boot 后端，负责后台接口、鉴权、数据持久化、餐单展示页渲染、AI/Coze 集成等能力。
+- `src/`：Spring Boot 后端，负责后台接口、鉴权、数据持久化、公开餐单数据接口、AI/Coze 集成等能力。
 - `admin-ui/`：Vue 3 后台管理端，负责客户、模板、字典、餐单、账号、角色权限等操作界面。
 - `example/`：最初的静态参考实现，保留用于迁移对照，不再作为正式运行入口。
 
@@ -17,7 +17,7 @@
 
 ## 技术栈
 
-- 后端：Java 17、Spring Boot 3.4、MyBatis-Plus、MySQL、Thymeleaf
+- 后端：Java 17、Spring Boot 3.4、MyBatis-Plus、MySQL
 - 前端：Vue 3、Vite、Element Plus、Pinia
 - 测试：JUnit 5 + Spring Boot Test、Vitest
 
@@ -27,7 +27,6 @@
 - `src/main/java/com/kfd/healthmenu/controller/api/auth`：登录、当前用户、退出登录
 - `src/main/java/com/kfd/healthmenu/service/impl`：核心业务实现
 - `src/main/resources/sql`：建表与初始化数据
-- `src/main/resources/templates/view`：餐单成品展示页模板
 - `admin-ui/src/views`：后台页面
 - `admin-ui/src/api`：前端接口封装
 - `admin-ui/src/stores`：登录态与权限状态管理
@@ -110,7 +109,7 @@ $env:APP_COZE_IMAGE_TOKEN="your-image-token"
 - `/api/admin/**`：后台接口
 - `/api/auth/**`：登录相关接口
 - `/api/public/**`：对外公开接口
-- `/view/menu/{id}`、`/share/menu/{token}`：餐单展示页
+- `/view/menu/{id}`、`/share/menu/{token}`：前端餐单展示页路由，需由 nginx 返回前端 `index.html`
 - `/` 与 `/admin` 已不再托管后台前端页面
 
 ## 前端开发

@@ -51,9 +51,10 @@
     <div class="menu-manual-title" id="menu-title" th:text="${menu != null and menu.title != null and !#strings.isEmpty(menu.title) ? menu.title : '专属餐单'}"></div>
 
     <div class="menu-manual-section" th:if="${menuForm != null and menuForm.showSwapGuide}">
-        <div class="menu-manual-section-title">核心食物互换速查指南</div>
         <th:block th:each="section : ${menuForm.sections}">
             <div th:if="${section.sectionType == 'SWAP_GUIDE'}" class="menu-manual-section-body">
+                <div class="menu-manual-section-title"
+                     th:text="${section.title != null and !#strings.isEmpty(section.title) ? section.title : '核心食物互换速查指南'}"></div>
                 <div class="menu-manual-section-content"
                      th:style="'color:' + ${section.color} + ';font-weight:' + (${section.bold} ? '700' : '400')"
                      th:text="${section.content != null and !#strings.isEmpty(section.content) ? section.content : '暂无指南'}"></div>
@@ -66,9 +67,10 @@
     </div>
 
     <div class="menu-manual-section" th:if="${menuForm != null and menuForm.showWeeklyTip}">
-        <div class="menu-manual-section-title">每周提示</div>
         <th:block th:each="section : ${menuForm.sections}">
             <div th:if="${section.sectionType == 'WEEKLY_TIP'}" class="menu-manual-section-body">
+                <div class="menu-manual-section-title"
+                     th:text="${section.title != null and !#strings.isEmpty(section.title) ? section.title : '每周提示'}"></div>
                 <div class="menu-manual-section-content"
                      th:style="'color:' + ${section.color} + ';font-weight:' + (${section.bold} ? '700' : '400')"
                      th:text="${section.content != null and !#strings.isEmpty(section.content) ? section.content : '暂无每周提示'}"></div>

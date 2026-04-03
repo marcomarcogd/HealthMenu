@@ -3,11 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getPublicMenuById, getPublicMenuByToken } from '../api/public-menu'
+import { resolvePresentationTitle, resolveSectionTitle } from '../utils/menu-presentation'
 
 const route = useRoute()
 const loading = ref(false)
 const errorMessage = ref('')
 const payload = ref(null)
+const pageRef = ref(null)
 const cardRef = ref(null)
 const logoSrc = `${import.meta.env.BASE_URL}logo.png`
 
@@ -16,10 +18,11 @@ let html2canvasLoader = null
 const menuForm = computed(() => payload.value?.menuForm || null)
 const meals = computed(() => menuForm.value?.meals || [])
 const shareMode = computed(() => Boolean(payload.value?.shareMode))
-const exclusiveTitleSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'EXCLUSIVE_TITLE') || null)
-const title = computed(() => exclusiveTitleSection.value?.content?.trim() || menuForm.value?.title || '专属餐单')
+const title = computed(() => resolvePresentationTitle(menuForm.value || {}))
 const swapGuideSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'SWAP_GUIDE') || null)
 const weeklyTipSection = computed(() => (menuForm.value?.sections || []).find((section) => section.sectionType === 'WEEKLY_TIP') || null)
+const swapGuideTitle = computed(() => resolveSectionTitle(swapGuideSection.value, '核心食物互换速查指南'))
+const weeklyTipTitle = computed(() => resolveSectionTitle(weeklyTipSection.value, '每周提示'))
 const extraSections = computed(() => (menuForm.value?.sections || []).filter((section) => !['SWAP_GUIDE', 'WEEKLY_TIP', 'EXCLUSIVE_TITLE', 'DAILY_MENU'].includes(section.sectionType)))
 const renderedMeals = computed(() => meals.value
   .map((meal) => ({
@@ -105,7 +108,7 @@ async function waitForPresentationAssets(root) {
 }
 
 async function exportImage() {
-  if (!cardRef.value) {
+  if (!pageRef.value || !cardRef.value) {
     return
   }
 
@@ -124,18 +127,33 @@ async function exportImage() {
     exportHost.style.pointerEvents = 'none'
     exportHost.style.opacity = '0'
 
-    const clone = cardRef.value.cloneNode(true)
+    const pageClone = pageRef.value.cloneNode(true)
+    const toolbar = pageClone.querySelector('.presentation-toolbar')
+    if (toolbar) {
+      toolbar.remove()
+    }
+
+    pageClone.style.minHeight = 'auto'
+    pageClone.style.padding = '0'
+    pageClone.style.background = 'transparent'
+    pageClone.style.width = `${Math.ceil(sourceRect.width)}px`
+
+    const clone = pageClone.querySelector('.presentation-card')
+    if (!clone) {
+      throw new Error('导出内容生成失败，请刷新页面后重试')
+    }
+
     clone.style.width = `${Math.ceil(sourceRect.width)}px`
     clone.style.maxWidth = `${Math.ceil(sourceRect.width)}px`
     clone.style.margin = '0'
 
-    exportHost.appendChild(clone)
+    exportHost.appendChild(pageClone)
     document.body.appendChild(exportHost)
 
-    await waitForPresentationAssets(clone)
+    await waitForPresentationAssets(pageClone)
     const exportRect = clone.getBoundingClientRect()
-    const exportViewportWidth = Math.max(window.innerWidth || 0, Math.ceil(exportRect.width), 1024)
-    const exportViewportHeight = Math.max(window.innerHeight || 0, Math.ceil(exportRect.height))
+    const exportViewportWidth = Math.ceil(exportRect.width)
+    const exportViewportHeight = Math.ceil(exportRect.height)
     const canvas = await html2canvas(clone, {
       scale: Math.max(2, Math.min(window.devicePixelRatio || 2, 3)),
       useCORS: true,
@@ -189,7 +207,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="presentation-page" v-loading="loading">
+  <div ref="pageRef" class="presentation-page" v-loading="loading">
     <div class="presentation-toolbar" :class="{ 'presentation-toolbar--share': shareMode }">
       <button class="presentation-btn presentation-btn--secondary" @click="printPage">打印</button>
       <button class="presentation-btn presentation-btn--primary" @click="exportImage">导出图片</button>
@@ -207,7 +225,7 @@ onBeforeUnmount(() => {
       </div>
 
       <section v-if="menuForm.showSwapGuide && swapGuideSection" class="presentation-section">
-        <div class="presentation-section-title">核心食物互换速查指南</div>
+        <div class="presentation-section-title">{{ swapGuideTitle }}</div>
         <div
           class="presentation-content"
           :style="{ color: swapGuideSection.color || '#2d2d2d', fontWeight: swapGuideSection.bold ? 700 : 400 }"
@@ -223,7 +241,7 @@ onBeforeUnmount(() => {
       </section>
 
       <section v-if="menuForm.showWeeklyTip && weeklyTipSection" class="presentation-section">
-        <div class="presentation-section-title">每周提示</div>
+        <div class="presentation-section-title">{{ weeklyTipTitle }}</div>
         <div
           class="presentation-content"
           :style="{ color: weeklyTipSection.color || '#2d2d2d', fontWeight: weeklyTipSection.bold ? 700 : 400 }"
@@ -239,7 +257,7 @@ onBeforeUnmount(() => {
       </section>
 
       <section v-for="section in extraSections" :key="`${section.sectionType}-${section.sortOrder}`" class="presentation-section">
-        <div class="presentation-section-title">{{ section.title || section.sectionType }}</div>
+        <div class="presentation-section-title">{{ resolveSectionTitle(section, section.sectionType) }}</div>
         <div
           class="presentation-content"
           :style="{ color: section.color || '#2d2d2d', fontWeight: section.bold ? 700 : 400 }"
@@ -295,7 +313,9 @@ onBeforeUnmount(() => {
 }
 
 .presentation-page,
-.presentation-page * {
+.presentation-page *,
+.presentation-card,
+.presentation-card * {
   font-family: 'FZZhongCuYaSong', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
